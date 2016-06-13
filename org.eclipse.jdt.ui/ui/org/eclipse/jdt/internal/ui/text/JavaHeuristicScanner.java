@@ -467,6 +467,8 @@ public final class JavaHeuristicScanner implements Symbols {
 			case 2:
 				if ("if".equals(s)) //$NON-NLS-1$
 					return TokenIF;
+				if ("IF".equals(s)) //$NON-NLS-1$
+					return Token_IF;
 				if ("do".equals(s)) //$NON-NLS-1$
 					return TokenDO;
 				break;
@@ -481,8 +483,12 @@ public final class JavaHeuristicScanner implements Symbols {
 			case 4:
 				if ("case".equals(s)) //$NON-NLS-1$
 					return TokenCASE;
+				if ("CASE".equals(s)) //$NON-NLS-1$
+					return Token_CASE;
 				if ("else".equals(s)) //$NON-NLS-1$
 					return TokenELSE;
+				if ("ELSE".equals(s)) //$NON-NLS-1$
+					return Token_ELSE;
 				if ("enum".equals(s)) //$NON-NLS-1$
 					return TokenENUM;
 				if ("goto".equals(s)) //$NON-NLS-1$
@@ -505,6 +511,8 @@ public final class JavaHeuristicScanner implements Symbols {
 					return TokenSTATIC;
 				if ("switch".equals(s)) //$NON-NLS-1$
 					return TokenSWITCH;
+			if ("SWITCH".equals(s)) //$NON-NLS-1$
+					return Token_SWITCH;
 				if ("throws".equals(s)) //$NON-NLS-1$
 					return TokenTHROWS;
 				break;
@@ -517,6 +525,8 @@ public final class JavaHeuristicScanner implements Symbols {
 			case 9:
 				if ("interface".equals(s)) //$NON-NLS-1$
 					return TokenINTERFACE;
+				if ("OTHERWISE".equals(s)) //$NON-NLS-1$
+					return Token_OTHERWISE;
 				break;
 			case 12:
 				if ("synchronized".equals(s)) //$NON-NLS-1$
@@ -902,12 +912,14 @@ public final class JavaHeuristicScanner implements Symbols {
 		switch (previousToken(position, bound)) {
 			case TokenDO:
 			case TokenELSE:
+			case Token_ELSE:
 				return true;
 			case TokenRPAREN:
 				position= findOpeningPeer(fPos, LPAREN, RPAREN);
 				if (position > 0) {
 					switch (previousToken(position - 1, bound)) {
 						case TokenIF:
+						case Token_IF:
 						case TokenFOR:
 						case TokenWHILE:
 							return true;

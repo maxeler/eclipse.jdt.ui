@@ -56,4 +56,14 @@ public interface Symbols {
 	int TokenENUM= 1028;
 	int TokenTHROWS= 1029;
 	int TokenIDENT= 2000;
+	
+	/**
+	 * Milan: New keywords
+	 */
+	int Token_IF= 3000;
+	int Token_ELSE= 3001;
+	int Token_SWITCH= 3002;
+	int Token_CASE= 3003;
+	int Token_OTHERWISE= 3004;
+	
 }
