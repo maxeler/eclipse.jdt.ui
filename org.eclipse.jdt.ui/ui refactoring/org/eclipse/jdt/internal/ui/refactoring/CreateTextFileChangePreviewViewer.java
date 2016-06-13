@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -134,7 +134,7 @@ public final class CreateTextFileChangePreviewViewer implements IChangePreviewVi
 			Object element= change.getModifiedElement();
 			if (element instanceof IAdaptable) {
 				IAdaptable adaptable= (IAdaptable) element;
-				IWorkbenchAdapter workbenchAdapter= (IWorkbenchAdapter) adaptable.getAdapter(IWorkbenchAdapter.class);
+				IWorkbenchAdapter workbenchAdapter= adaptable.getAdapter(IWorkbenchAdapter.class);
 				if (workbenchAdapter != null) {
 					fPane.setImageDescriptor(workbenchAdapter.getImageDescriptor(element));
 				} else {
@@ -161,11 +161,14 @@ public final class CreateTextFileChangePreviewViewer implements IChangePreviewVi
 		if ("java".equals(textType)) { //$NON-NLS-1$
 			textTools.setupJavaDocumentPartitioner(document);
 			fSourceViewer.configure(new JavaSourceViewerConfiguration(textTools.getColorManager(), store, null, null));
+			fSourceViewer.getTextWidget().setOrientation(SWT.LEFT_TO_RIGHT);
 		} else if ("properties".equals(textType)) { //$NON-NLS-1$
 			PropertiesFileDocumentSetupParticipant.setupDocument(document);
 			fSourceViewer.configure(new PropertiesFileSourceViewerConfiguration(textTools.getColorManager(), store, null, IPropertiesFilePartitions.PROPERTIES_FILE_PARTITIONING));
+			fSourceViewer.getTextWidget().setOrientation(SWT.LEFT_TO_RIGHT);
 		} else {
 			fSourceViewer.configure(new SourceViewerConfiguration());
+			fSourceViewer.getTextWidget().setOrientation(fSourceViewer.getTextWidget().getParent().getOrientation());
 		}
 		fSourceViewer.setInput(document);
 	}

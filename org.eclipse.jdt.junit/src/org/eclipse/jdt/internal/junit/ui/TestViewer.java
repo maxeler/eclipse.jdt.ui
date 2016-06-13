@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,7 +10,7 @@
  *     Brock Janiczak (brockj@tpg.com.au)
  *         - https://bugs.eclipse.org/bugs/show_bug.cgi?id=102236: [JUnit] display execution time next to each test
  *     Xavier Coulon <xcoulon@redhat.com> - https://bugs.eclipse.org/bugs/show_bug.cgi?id=102512 - [JUnit] test method name cut off before (
-
+ *     Andrej Zachar <andrej@chocolatejar.eu> - [JUnit] Add a filter for ignored tests - https://bugs.eclipse.org/bugs/show_bug.cgi?id=298603
  *******************************************************************************/
 
 package org.eclipse.jdt.internal.junit.ui;
@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.ListIterator;
 
 import org.eclipse.jdt.junit.model.ITestElement;
+import org.eclipse.jdt.junit.model.ITestElement.Result;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.Clipboard;
@@ -33,6 +34,8 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.TableItem;
+
+import org.eclipse.core.runtime.CoreException;
 
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IMenuListener;
@@ -53,18 +56,22 @@ import org.eclipse.jface.viewers.ViewerFilter;
 import org.eclipse.ui.IWorkbenchActionConstants;
 import org.eclipse.ui.part.PageBook;
 
+import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 
+import org.eclipse.jdt.internal.junit.launcher.ITestFinder;
 import org.eclipse.jdt.internal.junit.model.TestCaseElement;
 import org.eclipse.jdt.internal.junit.model.TestElement;
 import org.eclipse.jdt.internal.junit.model.TestElement.Status;
 import org.eclipse.jdt.internal.junit.model.TestRoot;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
 import org.eclipse.jdt.internal.junit.model.TestSuiteElement;
+
+import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 
 import org.eclipse.jdt.internal.ui.viewsupport.ColoringLabelProvider;
 import org.eclipse.jdt.internal.ui.viewsupport.SelectionProviderMediator;
@@ -98,6 +105,45 @@ public class TestViewer {
 				return ! fTestRunSession.isRunning() && status == Status.RUNNING;  // rerunning
 		}
 	}
+	
+	private final class IgnoredOnlyFilter extends ViewerFilter {
+		@Override
+		public boolean select(Viewer viewer, Object parentElement, Object element) {
+			return select(((TestElement) element));
+		}
+		
+		public boolean select(TestElement testElement) {
+			if (hasIgnoredInTestResult(testElement))
+				return true;
+			else
+				return !fTestRunSession.isRunning() && testElement.getStatus() == Status.RUNNING; // rerunning
+		}
+
+		/**
+		 * Checks whether a test was skipped i.e. it was ignored (<code>@Ignored</code>) or had any
+		 * assumption failure.
+		 * 
+		 * @param testElement the test element (a test suite or a single test case)
+		 * 
+		 * @return <code>true</code> if the test element or any of its children has
+		 *         {@link Result#IGNORED} test result
+		 */
+		private boolean hasIgnoredInTestResult(TestElement testElement) {
+			if (testElement instanceof TestSuiteElement) {
+				ITestElement[] children= ((TestSuiteElement) testElement).getChildren();
+				for (ITestElement child : children) {
+					boolean hasIgnoredTestResult= hasIgnoredInTestResult((TestElement) child);
+					if (hasIgnoredTestResult) {
+						return true;
+					}
+				}
+				return false;
+			}
+
+			return testElement.getTestResult(false) == Result.IGNORED;
+		}
+	}
+
 
 	private static class ReverseList<E> extends AbstractList<E> {
 		private final List<E> fList;
@@ -127,6 +173,7 @@ public class TestViewer {
 	}
 
 	private final FailuresOnlyFilter fFailuresOnlyFilter= new FailuresOnlyFilter();
+	private final IgnoredOnlyFilter fIgnoredOnlyFilter= new IgnoredOnlyFilter();
 
 	private final TestRunnerViewPart fTestRunnerPart;
 	private final Clipboard fClipboard;
@@ -221,9 +268,14 @@ public class TestViewer {
 			if (testElement instanceof TestSuiteElement) {
 				manager.add(new OpenTestAction(fTestRunnerPart, testLabel));
 				manager.add(new Separator());
-				if (testClassExists(className) && !fTestRunnerPart.lastLaunchIsKeptAlive()) {
-					manager.add(new RerunAction(JUnitMessages.RerunAction_label_run, fTestRunnerPart, testElement.getId(), className, null, ILaunchManager.RUN_MODE));
-					manager.add(new RerunAction(JUnitMessages.RerunAction_label_debug, fTestRunnerPart, testElement.getId(), className, null, ILaunchManager.DEBUG_MODE));
+				if (!fTestRunnerPart.lastLaunchIsKeptAlive()) {
+					IType testType= findTestClass(testElement);
+					if (testType != null) {
+						String qualifiedName= testType.getFullyQualifiedName();
+						String testName= qualifiedName.equals(className) ? null : testElement.getTestName();
+						manager.add(new RerunAction(JUnitMessages.RerunAction_label_run, fTestRunnerPart, testElement.getId(), qualifiedName, testName, ILaunchManager.RUN_MODE));
+						manager.add(new RerunAction(JUnitMessages.RerunAction_label_debug, fTestRunnerPart, testElement.getId(), qualifiedName, testName, ILaunchManager.DEBUG_MODE));
+					}
 				}
 			} else {
 				TestCaseElement testCaseElement= (TestCaseElement) testElement;
@@ -253,17 +305,37 @@ public class TestViewer {
 		manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS + "-end")); //$NON-NLS-1$
 	}
 
-	private boolean testClassExists(String className) {
+	/*
+	 * Returns the element's test class or the next container's test class, which exists, and for which ITestFinder.isTest() is true.
+	 */
+	private IType findTestClass(ITestElement element) {
+		ITestFinder finder= ((TestRunSession)element.getTestRunSession()).getTestRunnerKind().getFinder();
 		IJavaProject project= fTestRunnerPart.getLaunchedProject();
 		if (project == null)
-			return false;
-		try {
-			IType type= project.findType(className);
-			return type != null;
-		} catch (JavaModelException e) {
-			// fall through
+			return null;
+		ITestElement current= element;
+		while (current != null) {
+			try {
+				String className= null;
+				if (current instanceof TestRoot) {
+					ILaunchConfiguration configuration= ((TestRunSession)element.getTestRunSession()).getLaunch().getLaunchConfiguration();
+					className= configuration.getAttribute(IJavaLaunchConfigurationConstants.ATTR_MAIN_TYPE_NAME, (String)null);
+				} else if (current instanceof TestElement) {
+					className= ((TestElement)current).getClassName();
+				}
+				if (className != null) {
+					IType type= project.findType(className);
+					if (type != null && finder.isTest(type))
+						return type;
+				}
+			} catch (JavaModelException e) {
+				// fall through
+			} catch (CoreException e) {
+				// fall through
+			}
+			current= current instanceof TestElement ? ((TestElement)current).getParent() : null;
 		}
-		return false;
+		return null;
 	}
 
 	public Control getTestViewerControl() {
@@ -323,8 +395,15 @@ public class TestViewer {
 			fViewerbook.setRedraw(true);
 		}
 	}
-
-	public synchronized void setShowFailuresOnly(boolean failuresOnly, int layoutMode) {
+	
+	/**
+	 * It makes sense to display either failed or ignored tests, not both together.
+	 *
+	 * @param failuresOnly whether to show only failed tests
+	 * @param ignoredOnly whether to show only skipped tests
+	 * @param layoutMode the layout mode
+	 */
+	public synchronized void setShowFailuresOrIgnoredOnly(boolean failuresOnly, boolean ignoredOnly, int layoutMode) {
 		/*
 		 * Management of fTreeViewer and fTableViewer
 		 * ******************************************
@@ -352,22 +431,30 @@ public class TestViewer {
 				fLayoutMode= layoutMode;
 				fViewerbook.showPage(getActiveViewer().getControl());
 			}
-
 			//avoid realizing all TableItems, especially in flat mode!
 			StructuredViewer viewer= getActiveViewer();
-			if (failuresOnly) {
-				if (! getActiveViewerHasFilter()) {
-					setActiveViewerNeedsRefresh(true);
-					setActiveViewerHasFilter(true);
-					viewer.setInput(null);
-					viewer.addFilter(fFailuresOnlyFilter);
+			if (failuresOnly || ignoredOnly) {
+				if (getActiveViewerHasFilter()) {
+					//For simplicity clear both filters (only one of them is used)
+					viewer.removeFilter(fFailuresOnlyFilter);
+					viewer.removeFilter(fIgnoredOnlyFilter);
 				}
+				setActiveViewerHasFilter(true);
+				viewer.setInput(null);
+				//Set either the failures or the skipped tests filter
+				ViewerFilter filter= fFailuresOnlyFilter;
+				if (ignoredOnly == true) {
+					filter= fIgnoredOnlyFilter;
+				}
+				viewer.addFilter(filter);
+				setActiveViewerNeedsRefresh(true);
 
 			} else {
 				if (getActiveViewerHasFilter()) {
 					setActiveViewerNeedsRefresh(true);
 					setActiveViewerHasFilter(false);
 					viewer.setInput(null);
+					viewer.removeFilter(fIgnoredOnlyFilter);
 					viewer.removeFilter(fFailuresOnlyFilter);
 				}
 			}

@@ -30,7 +30,11 @@ public class JUnitJUnitTests {
 
 		addDeprecatedTests(suite);
 
-		suite.addTestSuite(TestRunListenerTest.class);
+		suite.addTestSuite(TestRunListenerTest3.class);
+		suite.addTestSuite(TestRunListenerTest4.class);
+		
+		suite.addTestSuite(TestRunFilteredStandardRunnerTest4.class);
+		suite.addTestSuite(TestRunFilteredParameterizedRunnerTest4.class);
 
 		suite.addTest(TestRunSessionSerializationTests3.suite());
 		suite.addTest(TestRunSessionSerializationTests4.suite());

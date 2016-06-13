@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2012 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,7 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
+ *     Terry Parker <tparker@google.com> (Google Inc.) - Bug 458852 - Speed up JDT text searches by supporting parallelism in its TextSearchRequestors
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.propertiesfileeditor;
 
@@ -116,13 +117,11 @@ public class PropertyKeyHyperlink implements IHyperlink {
 			this.showLineNumber= showLineNumber;
 		}
 
-		/*
-		 * @see org.eclipse.core.runtime.IAdaptable#getAdapter(java.lang.Class)
-		 */
+		@SuppressWarnings("unchecked")
 		@Override
-		public Object getAdapter(Class adapter) {
+		public <T> T getAdapter(Class<T> adapter) {
 			if (adapter == IWorkbenchAdapter.class)
-				return this;
+				return (T) this;
 			else
 				return super.getAdapter(adapter);
 		}
@@ -136,7 +135,7 @@ public class PropertyKeyHyperlink implements IHyperlink {
 		 * @see org.eclipse.ui.model.IWorkbenchAdapter#getImageDescriptor(java.lang.Object)
 		 */
 		public ImageDescriptor getImageDescriptor(Object object) {
-			IWorkbenchAdapter wbAdapter= (IWorkbenchAdapter) resource.getAdapter(IWorkbenchAdapter.class);
+			IWorkbenchAdapter wbAdapter= resource.getAdapter(IWorkbenchAdapter.class);
 			if (wbAdapter != null)
 				return wbAdapter.getImageDescriptor(resource);
 			return null;
@@ -190,12 +189,17 @@ public class PropertyKeyHyperlink implements IHyperlink {
 
 	private static class ResultCollector extends TextSearchRequestor {
 
-		private List<KeyReference> fResult;
-		private boolean fIsKeyDoubleQuoted;
+		private final List<KeyReference> fResult;
+		private final boolean fIsKeyDoubleQuoted;
 
 		public ResultCollector(List<KeyReference> result, boolean isKeyDoubleQuoted) {
 			fResult= result;
 			fIsKeyDoubleQuoted= isKeyDoubleQuoted;
+		}
+
+		@Override
+		public boolean canRunInParallel() {
+			return true;
 		}
 
 		@Override
@@ -207,7 +211,9 @@ public class PropertyKeyHyperlink implements IHyperlink {
 				start= start + 1;
 				length= length - 2;
 			}
-			fResult.add(new KeyReference(matchAccess.getFile(), null, start, length, true));
+			synchronized(fResult) {
+				fResult.add(new KeyReference(matchAccess.getFile(), null, start, length, true));
+			}
 			return true;
 		}
 	}
@@ -360,7 +366,7 @@ public class PropertyKeyHyperlink implements IHyperlink {
 
 			String message= null;
 
-			IWorkbenchAdapter wbAdapter= (IWorkbenchAdapter)((IAdaptable)keyReference).getAdapter(IWorkbenchAdapter.class);
+			IWorkbenchAdapter wbAdapter= ((IAdaptable)keyReference).getAdapter(IWorkbenchAdapter.class);
 			if (wbAdapter != null)
 				message= Messages.format(PropertiesFileEditorMessages.OpenAction_error_messageArgs,
 						new String[] { wbAdapter.getLabel(keyReference), x.getLocalizedMessage() } );
@@ -384,7 +390,7 @@ public class PropertyKeyHyperlink implements IHyperlink {
 
 	private void showErrorInStatusLine(final String message) {
 		fShell.getDisplay().beep();
-		final IEditorStatusLine statusLine= (IEditorStatusLine)fEditor.getAdapter(IEditorStatusLine.class);
+		final IEditorStatusLine statusLine= fEditor.getAdapter(IEditorStatusLine.class);
 		if (statusLine != null) {
 			fShell.getDisplay().asyncExec(new Runnable() {
 				/*

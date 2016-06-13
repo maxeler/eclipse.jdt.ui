@@ -9,6 +9,7 @@
  *     IBM Corporation - initial API and implementation
  *     Billy Huang <billyhuang31@gmail.com> - [quick assist] concatenate/merge string literals - https://bugs.eclipse.org/77632
  *     Lukas Hanke <hanke@yatta.de> - Bug 241696 [quick fix] quickfix to iterate over a collection - https://bugs.eclipse.org/bugs/show_bug.cgi?id=241696
+ *     Sandra Lions <sandra.lions-piron@oracle.com> - [quick fix] for qualified enum constants in switch-case labels - https://bugs.eclipse.org/bugs/90140
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.correction;
 
@@ -23,6 +24,10 @@ public interface IProposalRelevance {
 	public static final int ADD_OVERRIDE_ANNOTATION= 15;
 	public static final int ADD_DEPRECATED_ANNOTATION= 15;
 
+	public static final int CREATE_NON_STATIC_ACCESS_USING_DECLARING_TYPE= 12;
+	public static final int CREATE_INDIRECT_ACCESS_TO_STATIC= 12;
+	public static final int CREATE_NON_STATIC_ACCESS_USING_INSTANCE_TYPE= 11;
+	
 	public static final int REMOVE_UNUSED_CAST= 10;
 	public static final int ADD_UNIMPLEMENTED_METHODS= 10;
 	public static final int UNUSED_MEMBER= 10;
@@ -103,8 +108,6 @@ public interface IProposalRelevance {
 	public static final int CHANGE_METHOD_RETURN_TYPE= 6;
 	public static final int UNNECESSARY_NLS_TAG= 6;
 	public static final int RAW_TYPE_REFERENCE= 6;
-	public static final int CREATE_NON_STATIC_ACCESS_USING_DECLARING_TYPE= 6;
-	public static final int CREATE_INDIRECT_ACCESS_TO_STATIC= 6;
 	public static final int SURROUND_WITH_TRY_CATCH= 6;
 	public static final int REMOVE_REDUNDANT_TYPE_ARGUMENTS= 6;
 	public static final int REMOVE_REDUNDANT_SUPER_INTERFACE= 6;
@@ -123,6 +126,8 @@ public interface IProposalRelevance {
 	public static final int CHANGE_TO_ATTRIBUTE_SIMILAR_NAME= 6;
 	public static final int CREATE_FIELD= 6;
 	public static final int CONVERT_TO_LAMBDA_EXPRESSION= 6;
+	public static final int CONVERT_METHOD_REFERENCE_TO_LAMBDA= 6;
+	public static final int CONVERT_TO_METHOD_REFERENCE= 6;
 
 	public static final int ADD_ALL_MISSING_TAGS= 5;
 	public static final int QUALIFY_INNER_TYPE_NAME= 5;
@@ -141,7 +146,6 @@ public interface IProposalRelevance {
 	public static final int ADD_BLOCK= 5;
 	public static final int MAKE_TYPE_ABSTRACT= 5;
 	public static final int ADD_MISSING_NLS_TAGS= 5;
-	public static final int CREATE_NON_STATIC_ACCESS_USING_INSTANCE_TYPE= 5;
 	public static final int MAKE_TYPE_ABSTRACT_FIX= 5;
 	public static final int CONVERT_LOCAL_TO_FIELD= 5;
 	public static final int CONVERT_ANONYMOUS_TO_NESTED= 5;
@@ -180,6 +184,8 @@ public interface IProposalRelevance {
 	public static final int CORRECT_PACKAGE_DECLARATION= 5;
 	public static final int TYPE_ARGUMENTS_FROM_CONTEXT= 5;
 	public static final int REMOVE_REDUNDANT_NULLNESS_ANNOTATION= 5;
+	public static final int REPLACE_WITH_UNQUALIFIED_ENUM_CONSTANT= 5;
+	public static final int OVERRIDE_DEFAULT_METHOD= 5;
 
 	public static final int ADD_MISSING_TAG= 4;
 	public static final int INSERT_FALL_THROUGH= 4;
@@ -204,6 +210,7 @@ public interface IProposalRelevance {
 	public static final int CHANGE_TO_ATTRIBUTE= 3;
 	public static final int CHANGE_LAMBDA_BODY_TO_BLOCK= 3;
 	public static final int CHANGE_LAMBDA_BODY_TO_EXPRESSION= 3;
+	public static final int ADD_INFERRED_LAMBDA_PARAMETER_TYPES= 3;
 
 	public static final int CONVERT_TO_INDEXED_FOR_LOOP= 2;
 	public static final int GENERATE_ENHANCED_FOR_LOOP= 2;
@@ -286,7 +293,7 @@ public interface IProposalRelevance {
 	public static final int ADD_PARANOIDAL_PARENTHESES= -9;
 
 	public static final int ADD_PARENTHESES_FOR_EXPRESSION= -10;
-	
+
 	//Be careful while tweaking these values because WordCorrectionProposal uses -distance (between the words) as relevance.
 	public static final int DISABLE_SPELL_CHECKING= Integer.MIN_VALUE + 1;
 	public static final int WORD_IGNORE= Integer.MIN_VALUE + 1;

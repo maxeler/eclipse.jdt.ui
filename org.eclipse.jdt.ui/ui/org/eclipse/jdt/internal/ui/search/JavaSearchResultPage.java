@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -178,13 +178,13 @@ public class JavaSearchResultPage extends AbstractTextSearchViewPage implements 
 
 	private void initGroupingActions() {
 		fGroupProjectAction= new GroupAction(SearchMessages.JavaSearchResultPage_groupby_project, SearchMessages.JavaSearchResultPage_groupby_project_tooltip, this, LevelTreeContentProvider.LEVEL_PROJECT);
-		JavaPluginImages.setLocalImageDescriptors(fGroupProjectAction, "prj_mode.gif"); //$NON-NLS-1$
+		JavaPluginImages.setLocalImageDescriptors(fGroupProjectAction, "prj_mode.png"); //$NON-NLS-1$
 		fGroupPackageAction= new GroupAction(SearchMessages.JavaSearchResultPage_groupby_package, SearchMessages.JavaSearchResultPage_groupby_package_tooltip, this, LevelTreeContentProvider.LEVEL_PACKAGE);
-		JavaPluginImages.setLocalImageDescriptors(fGroupPackageAction, "package_mode.gif"); //$NON-NLS-1$
+		JavaPluginImages.setLocalImageDescriptors(fGroupPackageAction, "package_mode.png"); //$NON-NLS-1$
 		fGroupFileAction= new GroupAction(SearchMessages.JavaSearchResultPage_groupby_file, SearchMessages.JavaSearchResultPage_groupby_file_tooltip, this, LevelTreeContentProvider.LEVEL_FILE);
-		JavaPluginImages.setLocalImageDescriptors(fGroupFileAction, "file_mode.gif"); //$NON-NLS-1$
+		JavaPluginImages.setLocalImageDescriptors(fGroupFileAction, "file_mode.png"); //$NON-NLS-1$
 		fGroupTypeAction= new GroupAction(SearchMessages.JavaSearchResultPage_groupby_type, SearchMessages.JavaSearchResultPage_groupby_type_tooltip, this, LevelTreeContentProvider.LEVEL_TYPE);
-		JavaPluginImages.setLocalImageDescriptors(fGroupTypeAction, "type_mode.gif"); //$NON-NLS-1$
+		JavaPluginImages.setLocalImageDescriptors(fGroupTypeAction, "type_mode.png"); //$NON-NLS-1$
 	}
 
 	@Override
@@ -548,13 +548,10 @@ public class JavaSearchResultPage extends AbstractTextSearchViewPage implements 
 		return count;
 	}
 
-
-	/* (non-Javadoc)
-	 * @see org.eclipse.core.runtime.IAdaptable#getAdapter(java.lang.Class)
-	 */
-	public Object getAdapter(Class adapter) {
+	@SuppressWarnings("unchecked")
+	public <T> T getAdapter(Class<T> adapter) {
 		if (IShowInTargetList.class.equals(adapter)) {
-			return SHOW_IN_TARGET_LIST;
+			return (T) SHOW_IN_TARGET_LIST;
 		}
 		return null;
 	}

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,8 @@
  *     Benjamin Muskalla <b.muskalla@gmx.net> - [quick fix] Quick fix for missing synchronized modifier - https://bugs.eclipse.org/bugs/show_bug.cgi?id=245250
  *     Billy Huang <billyhuang31@gmail.com> - [quick assist] concatenate/merge string literals - https://bugs.eclipse.org/77632
  *     Lukas Hanke <hanke@yatta.de> - Bug 241696 [quick fix] quickfix to iterate over a collection - https://bugs.eclipse.org/bugs/show_bug.cgi?id=241696
+ *     Sandra Lions <sandra.lions-piron@oracle.com> - [quick fix] for qualified enum constants in switch-case labels - https://bugs.eclipse.org/bugs/90140
+ *     Jeremie Bresson <dev@jmini.fr> - Bug 439912: [1.8][quick assist] Add quick assists to add and remove parentheses around single lambda parameter - https://bugs.eclipse.org/439912
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.correction;
 
@@ -46,11 +48,13 @@ public final class CorrectionMessages extends NLS {
 	public static String QuickAssistProcessor_convert_local_to_field_description;
 	public static String QuickAssistProcessor_convert_to_indexed_for_loop;
 	public static String QuickAssistProcessor_convert_to_iterator_for_loop;
+	public static String QuickAssistProcessor_convert_to_lambda_expression;
 	public static String QuickAssistProcessor_generate_enhanced_for_loop;
 	public static String QuickAssistProcessor_generate_iterator_for_loop;
 	public static String QuickAssistProcessor_generate_for_loop;
 	public static String QuickAssistProcessor_generate_index_for_loop;
 	public static String QuickAssistProcessor_convert_to_message_format;
+	public static String QuickAssistProcessor_convert_to_method_reference;
 	public static String QuickAssistProcessor_convert_to_multiple_singletype_catch_blocks;
 	public static String QuickAssistProcessor_convert_to_single_multicatch_block;
 	public static String QuickAssistProcessor_convert_to_string_buffer_description;
@@ -260,6 +264,7 @@ public final class CorrectionMessages extends NLS {
 	public static String QuickAssistProcessor_change_lambda_body_to_expression;
 	public static String QuickAssistProcessor_removecatchclause_description;
 	public static String QuickAssistProcessor_removeexception_description;
+	public static String QuickAssistProcessor_removeParenthesesInLambda;
 	public static String QuickAssistProcessor_unwrap_ifstatement;
 	public static String QuickAssistProcessor_unwrap_whilestatement;
 	public static String QuickAssistProcessor_unwrap_forstatement;
@@ -272,8 +277,10 @@ public final class CorrectionMessages extends NLS {
 	public static String QuickAssistProcessor_unwrap_synchronizedstatement;
 	public static String QuickAssistProcessor_splitdeclaration_description;
 	public static String QuickAssistProcessor_joindeclaration_description;
+	public static String QuickAssistProcessor_add_inferred_lambda_parameter_types;
 	public static String QuickAssistProcessor_addfinallyblock_description;
 	public static String QuickAssistProcessor_addelseblock_description;
+	public static String QuickAssistProcessor_addParenthesesInLambda;
 	public static String QuickAssistProcessor_replacethenwithblock_description;
 	public static String QuickAssistProcessor_replaceelsewithblock_description;
 	public static String QuickAssistProcessor_replacethenelsewithblock_description;
@@ -390,6 +397,9 @@ public final class CorrectionMessages extends NLS {
 	public static String LocalCorrectionsSubProcessor_insert_cases_omitted;
 	public static String LocalCorrectionsSubProcessor_insert_fall_through;
 	public static String LocalCorrectionsSubProcessor_override_hashCode_description;
+	public static String LocalCorrectionsSubProcessor_override_default_method_description;
+	public static String LocalCorrectionsSubProcessor_override_method_description;
+	public static String LocalCorrectionsSubProcessor_replace_with_unqualified_enum_constant;
 	public static String LocalCorrectionsSubProcessor_throw_allocated_description;
 	public static String SuppressWarningsSubProcessor_fix_suppress_token_label;
 	public static String SuppressWarningsSubProcessor_remove_annotation_label;

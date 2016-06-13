@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -382,7 +382,7 @@ abstract class JavaBrowsingPart extends ViewPart implements IMenuListener, IView
 		getViewSite().getPage().addPostSelectionListener(this);
 		getViewSite().getPage().addPartListener(fPartListener);
 
-		activateHandlers((IHandlerService) getViewSite().getService(IHandlerService.class));
+		activateHandlers(getViewSite().getService(IHandlerService.class));
 		fillActionBars(getViewSite().getActionBars());
 
 		setHelp();
@@ -391,13 +391,14 @@ abstract class JavaBrowsingPart extends ViewPart implements IMenuListener, IView
 	/* (non-Javadoc)
 	 * @see org.eclipse.ui.part.WorkbenchPart#getAdapter(java.lang.Class)
 	 */
+	@SuppressWarnings("unchecked")
 	@Override
-	public Object getAdapter(Class key) {
+	public <T> T getAdapter(Class<T> key) {
 		if (key == IShowInSource.class) {
-			return getShowInSource();
+			return (T) getShowInSource();
 		}
 		if (key == IContextProvider.class)
-			return JavaUIHelp.getHelpContextProvider(this, getHelpContextId());
+			return (T) JavaUIHelp.getHelpContextProvider(this, getHelpContextId());
 
 		return super.getAdapter(key);
 	}
@@ -1104,7 +1105,7 @@ abstract class JavaBrowsingPart extends ViewPart implements IMenuListener, IView
 			if (firstElement instanceof IMarker)
 				firstElement= ((IMarker)firstElement).getResource();
 			if (firstElement instanceof IAdaptable) {
-				IJavaElement je= (IJavaElement)((IAdaptable)firstElement).getAdapter(IJavaElement.class);
+				IJavaElement je= ((IAdaptable)firstElement).getAdapter(IJavaElement.class);
 				if (je == null && firstElement instanceof IFile) {
 					IContainer parent= ((IFile)firstElement).getParent();
 					if (parent != null)
@@ -1196,12 +1197,12 @@ abstract class JavaBrowsingPart extends ViewPart implements IMenuListener, IView
 			}
 			if (ei instanceof IFileEditorInput) {
 				IFile file= ((IFileEditorInput)ei).getFile();
-				IJavaElement je= (IJavaElement)file.getAdapter(IJavaElement.class);
+				IJavaElement je= file.getAdapter(IJavaElement.class);
 				IContainer container= null;
 				if (je == null) {
 					container= ((IFileEditorInput)ei).getFile().getParent();
 					if (container != null)
-						je= (IJavaElement)container.getAdapter(IJavaElement.class);
+						je= container.getAdapter(IJavaElement.class);
 				}
 				if (je == null && container == null) {
 					setSelection(null, false);

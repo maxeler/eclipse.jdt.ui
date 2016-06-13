@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,6 +14,7 @@
  *								[quick fix] don't propose null annotations when those are disabled - https://bugs.eclipse.org/405086
  *								[quickfix] Update null annotation quick fixes for bug 388281 - https://bugs.eclipse.org/395555
  *     Lukas Hanke <hanke@yatta.de> - Bug 241696 [quick fix] quickfix to iterate over a collection - https://bugs.eclipse.org/bugs/show_bug.cgi?id=241696
+ *     Sandra Lions <sandra.lions-piron@oracle.com> - [quick fix] for qualified enum constants in switch-case labels - https://bugs.eclipse.org/bugs/90140
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.correction;
 
@@ -161,6 +162,7 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			case IProblem.DuplicateMethod:
 			case IProblem.DuplicateTypeVariable:
 			case IProblem.DuplicateNestedType:
+			case IProblem.IllegalQualifiedEnumConstantLabel:
 			case IProblem.IllegalModifierForInterfaceMethod:
 			case IProblem.IllegalModifierForInterfaceMethod18:
 			case IProblem.IllegalModifierForInterface:
@@ -273,6 +275,8 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			case IProblem.ConstructorReferenceNotBelow18:
 			case IProblem.IntersectionCastNotBelow18:
 			case IProblem.InvalidUsageOfTypeAnnotations:
+			case IProblem.DuplicateInheritedDefaultMethods:
+			case IProblem.InheritedDefaultMethodConflictsWithOtherInherited:
 				return true;
 			default:
 				return SuppressWarningsSubProcessor.hasSuppressWarningsProposal(cu.getJavaProject(), problemId);
@@ -628,10 +632,12 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			case IProblem.SwitchOnStringsNotBelow17:
 				ReorgCorrectionsSubProcessor.getNeedHigherComplianceProposals(context, problem, proposals, JavaCore.VERSION_1_7);
 				break;
+			case IProblem.LambdaExpressionNotBelow18:
+				LocalCorrectionsSubProcessor.getConvertLambdaToAnonymousClassCreationsProposals(context, problem, proposals);
+				//$FALL-THROUGH$
 			case IProblem.ExplicitThisParameterNotBelow18:
 			case IProblem.DefaultMethodNotBelow18:
 			case IProblem.StaticInterfaceMethodNotBelow18:
-			case IProblem.LambdaExpressionNotBelow18:
 			case IProblem.MethodReferenceNotBelow18:
 			case IProblem.ConstructorReferenceNotBelow18:
 			case IProblem.IntersectionCastNotBelow18:
@@ -759,6 +765,13 @@ public class QuickFixProcessor implements IQuickFixProcessor {
 			case IProblem.ConflictingInheritedNullAnnotations:
 				NullAnnotationsCorrectionProcessor.addReturnAndArgumentTypeProposal(context, problem, ChangeKind.LOCAL, proposals);
 				NullAnnotationsCorrectionProcessor.addReturnAndArgumentTypeProposal(context, problem, ChangeKind.INVERSE, proposals);
+				break;
+			case IProblem.IllegalQualifiedEnumConstantLabel:
+				LocalCorrectionsSubProcessor.addIllegalQualifiedEnumConstantLabelProposal(context, problem, proposals);
+				break;
+			case IProblem.DuplicateInheritedDefaultMethods:
+			case IProblem.InheritedDefaultMethodConflictsWithOtherInherited:
+				LocalCorrectionsSubProcessor.addOverrideDefaultMethodProposal(context, problem, proposals);
 				break;
 			default:
 		}

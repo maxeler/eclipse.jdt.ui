@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -51,7 +51,7 @@ import org.eclipse.jdt.internal.corext.dom.Bindings;
 
 import org.eclipse.jdt.ui.PreferenceConstants;
 
-/**
+	/**
  * Semantic highlightings
  *
  * @since 3.0
@@ -1194,17 +1194,21 @@ public class SemanticHighlightings {
 					return true;
 				if (binding instanceof IMethodBinding) {
 					IMethodBinding methodBinding= (IMethodBinding) binding;
-					if (methodBinding.isConstructor() && methodBinding.getJavaElement() == null) {
-						ITypeBinding declaringClass= methodBinding.getDeclaringClass();
-						if (declaringClass.isAnonymous()) {
-							ITypeBinding[] interfaces= declaringClass.getInterfaces();
-							if (interfaces.length > 0)
-								return interfaces[0].isDeprecated();
-							else
-								return declaringClass.getSuperclass().isDeprecated();
-						}
-						return declaringClass.isDeprecated();
+					ITypeBinding declaringClass= methodBinding.getDeclaringClass();
+					if (declaringClass == null)
+						return false;
+					if (declaringClass.isAnonymous()) {
+						ITypeBinding[] interfaces= declaringClass.getInterfaces();
+						if (interfaces.length > 0)
+							return interfaces[0].isDeprecated();
+						else
+							return declaringClass.getSuperclass().isDeprecated();
 					}
+					return declaringClass.isDeprecated() && !(token.getNode().getParent() instanceof MethodDeclaration);
+				} else if (binding instanceof IVariableBinding) {
+					IVariableBinding variableBinding= (IVariableBinding) binding;
+					ITypeBinding declaringClass= variableBinding.getDeclaringClass();
+					return declaringClass != null && declaringClass.isDeprecated() && !(token.getNode().getParent() instanceof VariableDeclaration);
 				}
 			}
 			return false;

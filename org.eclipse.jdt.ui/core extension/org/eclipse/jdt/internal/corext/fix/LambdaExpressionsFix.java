@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2013, 2014 IBM Corporation and others.
+ * Copyright (c) 2013, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,8 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
+ *     Jerome Cambon <jerome.cambon@oracle.com> - [1.8][clean up][quick assist] Convert lambda to anonymous must qualify references to 'this'/'super' - https://bugs.eclipse.org/430573
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.corext.fix;
 
@@ -21,6 +23,7 @@ import org.eclipse.core.runtime.CoreException;
 
 import org.eclipse.text.edits.TextEditGroup;
 
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTVisitor;
@@ -33,12 +36,14 @@ import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ExpressionStatement;
+import org.eclipse.jdt.core.dom.IAnnotationBinding;
 import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.LambdaExpression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
@@ -69,6 +74,7 @@ import org.eclipse.jdt.internal.corext.util.JdtFlags;
 import org.eclipse.jdt.ui.cleanup.ICleanUpFix;
 
 import org.eclipse.jdt.internal.ui.preferences.JavaPreferencesSettings;
+import org.eclipse.jdt.internal.ui.text.correction.ASTResolving;
 
 public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 
@@ -84,7 +90,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 		
 		@Override
 		public boolean visit(ClassInstanceCreation node) {
-			if (isFunctionalAnonymous(node)) {
+			if (isFunctionalAnonymous(node) && !fConversionRemovesAnnotations) {
 				fNodes.add(node);
 			}
 			return true;
@@ -170,7 +176,9 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 		
 		@Override
 		public boolean visit(SuperFieldAccess node) {
-			throw new AbortSearchException();
+			if (node.getQualifier() == null)
+				throw new AbortSearchException();
+			return true; // references to outer scope are harmless
 		}
 		
 		@Override
@@ -183,6 +191,62 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 		}
 	}
 	
+	private static final class SuperThisQualifier extends HierarchicalASTVisitor {
+
+		private ITypeBinding fQualifierTypeBinding;
+		private ImportRewrite fImportRewrite;
+		private ASTRewrite fASTRewrite;
+		private TextEditGroup fGroup;
+
+		public static void perform(LambdaExpression lambdaExpression, ITypeBinding parentTypeBinding, CompilationUnitRewrite cuRewrite, TextEditGroup group) {
+			SuperThisQualifier qualifier= new SuperThisQualifier();
+			qualifier.fQualifierTypeBinding= parentTypeBinding;
+			qualifier.fImportRewrite= cuRewrite.getImportRewrite();
+			qualifier.fASTRewrite= cuRewrite.getASTRewrite();
+			qualifier.fGroup= group;
+			lambdaExpression.accept(qualifier);
+		}
+
+		public Name getQualifierTypeName() {
+			String typeName= fImportRewrite.addImport(fQualifierTypeBinding);
+			return fASTRewrite.getAST().newName(typeName);
+		}
+
+		@Override
+		public boolean visit(AnonymousClassDeclaration node) {
+			return false;
+		}
+
+		@Override
+		public boolean visit(BodyDeclaration node) {
+			return false;
+		}
+
+		@Override
+		public boolean visit(SuperFieldAccess node) {
+			if (node.getQualifier() == null) {
+				fASTRewrite.set(node, SuperFieldAccess.QUALIFIER_PROPERTY, getQualifierTypeName(), fGroup);
+			}
+			return true;
+		}
+
+		@Override
+		public boolean visit(SuperMethodInvocation node) {
+			if (node.getQualifier() == null) {
+				fASTRewrite.set(node, SuperMethodInvocation.QUALIFIER_PROPERTY, getQualifierTypeName(), fGroup);
+			}
+			return true;
+		}
+
+		@Override
+		public boolean visit(ThisExpression node) {
+			if (node.getQualifier() == null) {
+				fASTRewrite.set(node, ThisExpression.QUALIFIER_PROPERTY, getQualifierTypeName(), fGroup);
+			}
+			return true;
+		}
+	}
+
 	private static class CreateLambdaOperation extends CompilationUnitRewriteOperation {
 
 		private final List<ClassInstanceCreation> fExpressions;
@@ -216,7 +280,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 				HashSet<String> excludedNames= new HashSet<String>();
 				if (i != 0) {
 					for (ClassInstanceCreation convertedCic : fExpressions.subList(0, i)) {
-						if (ASTNodes.isParent(classInstanceCreation, convertedCic)) {
+						if (ASTNodes.isParent(convertedCic, classInstanceCreation)) {
 							excludedNames.addAll(cicToNewNames.get(convertedCic));
 						}
 					}
@@ -253,7 +317,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 				//TODO: Bug 421479: [1.8][clean up][quick assist] convert anonymous to lambda must consider lost scope of interface
 //				lambdaBody.accept(new InterfaceAccessQualifier(rewrite, classInstanceCreation.getType().resolveBinding())); //TODO: maybe need a separate ASTRewrite and string placeholder
 				
-				lambdaExpression.setBody(rewrite.createCopyTarget(lambdaBody));
+				lambdaExpression.setBody(ASTNodes.getCopyOrReplacement(rewrite, lambdaBody, group));
 				Expression replacement= lambdaExpression;
 				if (ASTNodes.isTargetAmbiguous(classInstanceCreation, lambdaParameters.isEmpty())) {
 					CastExpression cast= ast.newCastExpression();
@@ -391,19 +455,39 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 				final CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(cuRewrite.getCu().getJavaProject());
 				ImportRewrite importRewrite= cuRewrite.getImportRewrite();
 				ImportRewriteContext importContext= new ContextSensitiveImportRewriteContext(lambdaExpression, importRewrite);
-				
+
+				IBinding contextBinding= null; // used to find @NonNullByDefault effective at that current context
+				if (cuRewrite.getCu().getJavaProject().getOption(JavaCore.COMPILER_ANNOTATION_NULL_ANALYSIS, true).equals(JavaCore.ENABLED)) {
+					contextBinding= ASTNodes.getEnclosingDeclaration(lambdaExpression);
+				}
+
 				MethodDeclaration methodDeclaration= StubUtility2.createImplementationStub(cuRewrite.getCu(), rewrite, importRewrite, importContext,
-						methodBinding, parameterNames, lambdaTypeBinding.getName(), settings, false);
+						methodBinding, parameterNames, lambdaTypeBinding, settings, false, contextBinding);
+
+				// Qualify reference to this or super
+				ASTNode parentType= ASTResolving.findParentType(lambdaExpression);
+				ITypeBinding parentTypeBinding= null;
+				if (parentType instanceof AbstractTypeDeclaration) {
+					parentTypeBinding= ((AbstractTypeDeclaration) parentType).resolveBinding();
+				} else if (parentType instanceof AnonymousClassDeclaration) {
+					parentTypeBinding= ((AnonymousClassDeclaration) parentType).resolveBinding();
+				}
+				if (parentTypeBinding != null) {
+					parentTypeBinding= Bindings.normalizeTypeBinding(parentTypeBinding);
+					if (parentTypeBinding != null) {
+						SuperThisQualifier.perform(lambdaExpression, parentTypeBinding.getTypeDeclaration(), cuRewrite, group);
+					}
+				}
 
 				Block block;
 				ASTNode lambdaBody= lambdaExpression.getBody();
 				if (lambdaBody instanceof Block) {
-					block= (Block) rewrite.createCopyTarget(lambdaBody);
+					block= (Block) ASTNodes.getCopyOrReplacement(rewrite, lambdaBody, group);
 				} else {
 					block= ast.newBlock();
 					List<Statement> statements= block.statements();
 					ITypeBinding returnType= methodBinding.getReturnType();
-					Expression copyTarget= (Expression) rewrite.createCopyTarget(lambdaBody);
+					Expression copyTarget= (Expression) ASTNodes.getCopyOrReplacement(rewrite, lambdaBody, group);
 					if (Bindings.isVoidType(returnType)) {
 						ExpressionStatement newExpressionStatement= ast.newExpressionStatement(copyTarget);
 						statements.add(newExpressionStatement);
@@ -435,6 +519,8 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 			}
 		}
 	}
+
+	private static boolean fConversionRemovesAnnotations;
 
 	public static LambdaExpressionsFix createConvertToLambdaFix(ClassInstanceCreation cic) {
 		CompilationUnit root= (CompilationUnit) cic.getRoot();
@@ -468,6 +554,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 			if (convertibleNodes.isEmpty())
 				return null;
 
+			Collections.reverse(convertibleNodes); // process nested anonymous classes first
 			CompilationUnitRewriteOperation op= new CreateLambdaOperation(convertibleNodes);
 			return new LambdaExpressionsFix(FixMessages.LambdaExpressionsFix_convert_to_lambda_expression, compilationUnit, new CompilationUnitRewriteOperation[] { op });
 			
@@ -476,6 +563,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 			if (convertibleNodes.isEmpty())
 				return null;
 			
+			Collections.reverse(convertibleNodes); // process nested lambdas first
 			CompilationUnitRewriteOperation op= new CreateAnonymousClassCreationOperation(convertibleNodes);
 			return new LambdaExpressionsFix(FixMessages.LambdaExpressionsFix_convert_to_anonymous_class_creation, compilationUnit, new CompilationUnitRewriteOperation[] { op });
 			
@@ -524,8 +612,26 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 		
 		if (!isInTargetTypeContext(node))
 			return false;
-		
+
+		// Check if annotations other than @Override and @Deprecated will be removed
+		checkAnnotationsRemoval(methodBinding);
+
 		return true;
+	}
+
+	private static void checkAnnotationsRemoval(IMethodBinding methodBinding) {
+		fConversionRemovesAnnotations= false;
+		IAnnotationBinding[] declarationAnnotations= methodBinding.getAnnotations();
+		for (IAnnotationBinding declarationAnnotation : declarationAnnotations) {
+			ITypeBinding annotationType= declarationAnnotation.getAnnotationType();
+			if (annotationType != null) {
+				String qualifiedName= annotationType.getQualifiedName();
+				if (!"java.lang.Override".equals(qualifiedName) && !"java.lang.Deprecated".equals(qualifiedName)) { //$NON-NLS-1$ //$NON-NLS-2$
+					fConversionRemovesAnnotations= true;
+					return;
+				}
+			}
+		}
 	}
 
 	private static boolean isInTargetTypeContext(ClassInstanceCreation node) {
@@ -547,7 +653,7 @@ public class LambdaExpressionsFix extends CompilationUnitRewriteOperationsFix {
 			return methodBinding.getReturnType().getFunctionalInterfaceMethod() != null;
 		}
 		
-		//TODO: should also check whether variable is of a functional type 
+		//TODO: should also check whether variable is of a functional type
 		return locationInParent == SingleVariableDeclaration.INITIALIZER_PROPERTY
 				|| locationInParent == VariableDeclarationFragment.INITIALIZER_PROPERTY
 				|| locationInParent == Assignment.RIGHT_HAND_SIDE_PROPERTY

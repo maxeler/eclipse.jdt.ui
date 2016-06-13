@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@
  *     Benjamin Muskalla <bmuskalla@innoopract.com> - [quick fix] 'Remove invalid modifiers' does not appear for enums and annotations - https://bugs.eclipse.org/bugs/show_bug.cgi?id=110589
  *     Benjamin Muskalla <b.muskalla@gmx.net> - [quick fix] Quick fix for missing synchronized modifier - https://bugs.eclipse.org/bugs/show_bug.cgi?id=245250
  *     Rabea Gransberger <rgransberger@gmx.de> - [quick fix] Fix several visibility issues - https://bugs.eclipse.org/394692
+ *     Jerome Cambon <jerome.cambon@oracle.com> - [code style] don't generate redundant modifiers "public static final abstract" for interface members - https://bugs.eclipse.org/71627
  *******************************************************************************/
 package org.eclipse.jdt.ui.tests.quickfix;
 
@@ -847,6 +848,44 @@ public class ModifierCorrectionsQuickFixTest extends QuickFixTest {
 		buf= new StringBuffer();
 		buf.append("package test1;\n");
 		buf.append("public abstract class E {\n");
+		buf.append("    public abstract void foo();\n");
+		buf.append("}\n");
+		String expected2= buf.toString();
+
+		assertEqualStringsIgnoreOrder(new String[] { preview1, preview2 }, new String[] { expected1, expected2 });
+
+	}
+
+	public void testAbstractMethodWithBody2() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("abstract class C {\n");
+		buf.append("    public abstract strictfp void foo() {}\n");
+		buf.append("}\n");
+		ICompilationUnit cu= pack1.createCompilationUnit("C.java", buf.toString(), false, null);
+
+		CompilationUnit astRoot= getASTRoot(cu);
+		ArrayList proposals= collectAllCorrections(cu, astRoot, 2);
+		assertNumberOfProposals(proposals, 2);
+		assertCorrectLabels(proposals);
+
+		CUCorrectionProposal proposal= (CUCorrectionProposal)proposals.get(0);
+		String preview1= getPreviewContent(proposal);
+
+		buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("abstract class C {\n");
+		buf.append("    public strictfp void foo() {}\n");
+		buf.append("}\n");
+		String expected1= buf.toString();
+
+		proposal= (CUCorrectionProposal)proposals.get(1);
+		String preview2= getPreviewContent(proposal);
+
+		buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("abstract class C {\n");
 		buf.append("    public abstract void foo();\n");
 		buf.append("}\n");
 		String expected2= buf.toString();
@@ -3491,6 +3530,52 @@ public class ModifierCorrectionsQuickFixTest extends QuickFixTest {
 		buf.append("    public boolean isAlive(OtherMachine m) throws IOException {\n");
 		buf.append("        return false;\n");
 		buf.append("    }\n");
+		buf.append("}\n");
+		expected[1]= buf.toString();
+
+		assertExpectedExistInProposals(proposals, expected);
+	}
+
+	public void testCreateMethodWhenOverrideAnnotation() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("pack", false, null);
+
+		StringBuffer buf= new StringBuffer();
+		buf.append("package pack;\n");
+		buf.append("\n");
+		buf.append("public abstract class OtherMachine {\n");
+		buf.append("}\n");
+		pack1.createCompilationUnit("OtherMachine.java", buf.toString(), false, null);
+
+		buf= new StringBuffer();
+		buf.append("package pack;\n");
+		buf.append("\n");
+		buf.append("public abstract class Machine extends OtherMachine {\n");
+		buf.append("    @Override\n");
+		buf.append("    public abstract void m1();\n");
+		buf.append("}\n");
+		ICompilationUnit cu= pack1.createCompilationUnit("Machine.java", buf.toString(), false, null);
+
+		CompilationUnit astRoot= getASTRoot(cu);
+		ArrayList proposals= collectCorrections(cu, astRoot);
+
+		assertCorrectLabels(proposals);
+		assertNumberOfProposals(proposals, 2);
+
+		String[] expected= new String[2];
+		buf= new StringBuffer();
+		buf.append("package pack;\n");
+		buf.append("\n");
+		buf.append("public abstract class OtherMachine {\n");
+		buf.append("\n");
+		buf.append("    public abstract void m1();\n");
+		buf.append("}\n");
+		expected[0]= buf.toString();
+
+		buf= new StringBuffer();
+		buf.append("package pack;\n");
+		buf.append("\n");
+		buf.append("public abstract class Machine extends OtherMachine {\n");
+		buf.append("    public abstract void m1();\n");
 		buf.append("}\n");
 		expected[1]= buf.toString();
 

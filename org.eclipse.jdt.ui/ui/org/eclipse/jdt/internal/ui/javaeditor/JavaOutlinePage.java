@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -241,12 +241,10 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 					return JavaEditorMessages.JavaOutlinePage_error_NoTopLevelType;
 				}
 
-				/*
-				 * @see org.eclipse.core.runtime.IAdaptable#getAdapter(Class)
-				 */
-				public Object getAdapter(Class clas) {
+				@SuppressWarnings("unchecked")
+				public <T> T getAdapter(Class<T> clas) {
 					if (clas == IWorkbenchAdapter.class)
-						return this;
+						return (T) this;
 					return null;
 				}
 			}
@@ -478,7 +476,7 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 					super();
 					PlatformUI.getWorkbench().getHelpSystem().setHelp(this, IJavaHelpContextIds.LEXICAL_SORTING_OUTLINE_ACTION);
 					setText(JavaEditorMessages.JavaOutlinePage_Sort_label);
-					JavaPluginImages.setLocalImageDescriptors(this, "alphab_sort_co.gif"); //$NON-NLS-1$
+					JavaPluginImages.setLocalImageDescriptors(this, "alphab_sort_co.png"); //$NON-NLS-1$
 					setToolTipText(JavaEditorMessages.JavaOutlinePage_Sort_tooltip);
 					setDescription(JavaEditorMessages.JavaOutlinePage_Sort_description);
 
@@ -518,7 +516,7 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 				setText(JavaEditorMessages.JavaOutlinePage_GoIntoTopLevelType_label);
 				setToolTipText(JavaEditorMessages.JavaOutlinePage_GoIntoTopLevelType_tooltip);
 				setDescription(JavaEditorMessages.JavaOutlinePage_GoIntoTopLevelType_description);
-				JavaPluginImages.setLocalImageDescriptors(this, "gointo_toplevel_type.gif"); //$NON-NLS-1$
+				JavaPluginImages.setLocalImageDescriptors(this, "gointo_toplevel_type.png"); //$NON-NLS-1$
 
 				IPreferenceStore preferenceStore= JavaPlugin.getDefault().getPreferenceStore();
 				boolean showclass= preferenceStore.getBoolean("GoIntoTopLevelTypeAction.isChecked"); //$NON-NLS-1$
@@ -1030,7 +1028,7 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 
 		registerToolbarActions(actionBars);
 
-		IHandlerService handlerService= (IHandlerService)site.getService(IHandlerService.class);
+		IHandlerService handlerService= site.getService(IHandlerService.class);
 		handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_TOGGLE_LINK_WITH_EDITOR, new ActionHandler(fToggleLinkingAction));
 		handlerService.activateHandler(CollapseAllHandler.COMMAND_ID, new ActionHandler(fCollapseAllAction));
 
@@ -1148,15 +1146,13 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 		return fActions.get(actionID);
 	}
 
-	/*
-	 * @see org.eclipse.core.runtime.IAdaptable#getAdapter(java.lang.Class)
-	 */
-	public Object getAdapter(Class key) {
+	@SuppressWarnings("unchecked")
+	public <T> T getAdapter(Class<T> key) {
 		if (key == IShowInSource.class) {
-			return getShowInSource();
+			return (T) getShowInSource();
 		}
 		if (key == IShowInTargetList.class) {
-			return new IShowInTargetList() {
+			return (T) new IShowInTargetList() {
 				public String[] getShowInTargetIds() {
 					return new String[] { JavaUI.ID_PACKAGES };
 				}
@@ -1164,7 +1160,7 @@ public class JavaOutlinePage extends Page implements IContentOutlinePage, IAdapt
 			};
 		}
 		if (key == IShowInTarget.class) {
-			return getShowInTarget();
+			return (T) getShowInTarget();
 		}
 
 		return null;

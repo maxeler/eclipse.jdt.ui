@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Mateusz Wenus <mateusz.wenus@gmail.com> - [override method] generate in declaration order [code generation] - https://bugs.eclipse.org/bugs/show_bug.cgi?id=140971
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.corext.codemanipulation;
 
@@ -210,7 +211,7 @@ public final class AddUnimplementedMethodsOperation implements IWorkspaceRunnabl
 
 			for (int i= 0; i < methodsToImplement.length; i++) {
 				IMethodBinding curr= methodsToImplement[i];
-				MethodDeclaration stub= StubUtility2.createImplementationStub(cu, astRewrite, importRewrite, context, curr, currTypeBinding.getName(), settings, currTypeBinding.isInterface());
+				MethodDeclaration stub= StubUtility2.createImplementationStub(cu, astRewrite, importRewrite, context, curr, currTypeBinding, settings, currTypeBinding.isInterface(), currTypeBinding);
 				if (stub != null) {
 					fCreatedMethods.add(curr.getKey());
 					if (insertion != null)

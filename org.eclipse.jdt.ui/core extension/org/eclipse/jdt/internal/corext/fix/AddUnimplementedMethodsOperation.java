@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Mateusz Wenus <mateusz.wenus@gmail.com> - [override method] generate in declaration order [code generation] - https://bugs.eclipse.org/bugs/show_bug.cgi?id=140971
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 
 package org.eclipse.jdt.internal.corext.fix;
@@ -30,8 +31,8 @@ import org.eclipse.jdt.core.dom.IVariableBinding;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
-import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite.ImportRewriteContext;
+import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 
 import org.eclipse.jdt.internal.corext.codemanipulation.CodeGenerationSettings;
 import org.eclipse.jdt.internal.corext.codemanipulation.ContextSensitiveImportRewriteContext;
@@ -77,14 +78,17 @@ public class AddUnimplementedMethodsOperation extends CompilationUnitRewriteOper
 		CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(unit.getJavaProject());
 
 		ListRewrite listRewrite;
+		ITypeBinding currentType= null;
 
 		if (fTypeNode instanceof AnonymousClassDeclaration) {
 			AnonymousClassDeclaration decl= (AnonymousClassDeclaration) fTypeNode;
 			listRewrite= rewrite.getListRewrite(decl, AnonymousClassDeclaration.BODY_DECLARATIONS_PROPERTY);
 			settings.createComments= false;
+			currentType= decl.resolveBinding();
 		} else if (fTypeNode instanceof AbstractTypeDeclaration) {
 			AbstractTypeDeclaration decl= (AbstractTypeDeclaration) fTypeNode;
 			listRewrite= rewrite.getListRewrite(decl, decl.getBodyDeclarationsProperty());
+			currentType= decl.resolveBinding();
 		} else if (fTypeNode instanceof EnumConstantDeclaration) {
 			EnumConstantDeclaration enumConstantDeclaration= (EnumConstantDeclaration) fTypeNode;
 			AnonymousClassDeclaration anonymousClassDeclaration= enumConstantDeclaration.getAnonymousClassDeclaration();
@@ -104,7 +108,7 @@ public class AddUnimplementedMethodsOperation extends CompilationUnitRewriteOper
 
 		for (int i= 0; i < unimplementedMethods.length; i++) {
 			IMethodBinding curr= unimplementedMethods[i];
-			MethodDeclaration newMethodDecl= StubUtility2.createImplementationStub(unit, rewrite, imports, context, curr, curr.getDeclaringClass().getName(), settings, false);
+			MethodDeclaration newMethodDecl= StubUtility2.createImplementationStub(unit, rewrite, imports, context, curr, curr.getDeclaringClass(), settings, false, currentType);
 			listRewrite.insertLast(newMethodDecl, createTextEditGroup(CorrectionMessages.AddUnimplementedMethodsOperation_AddMissingMethod_group, cuRewrite));
 		}
 	}

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2008 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,7 @@
  *
  * Contributors:
  *     IBM Corporation - initial API and implementation
+ *     Dirk Olmes <dirk@xanthippe.ping.de> - [refactoring] Allow expanding/collapsing folders on the ReorgUserInputPage - https://bugs.eclipse.org/bugs/show_bug.cgi?id=430750
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.refactoring.reorg;
 
@@ -21,9 +22,12 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 
 import org.eclipse.jface.dialogs.Dialog;
+import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeViewer;
@@ -74,6 +78,7 @@ abstract class ReorgUserInputPage extends UserInputWizardPage{
 				ReorgUserInputPage.this.viewerSelectionChanged(event);
 			}
 		});
+		fViewer.addDoubleClickListener(new TreeViewerDoubleClickListener());
 		Dialog.applyDialogFont(result);
 	}
 
@@ -115,10 +120,11 @@ abstract class ReorgUserInputPage extends UserInputWizardPage{
 	protected abstract Object getInitiallySelectedElement();
 
 	/**
-	 * Set and verify destination
-	 * @param selected
+	 * Set and verify the destination.
+	 * 
+	 * @param selected the selected destination
 	 * @return the resulting status
-	 * @throws JavaModelException
+	 * @throws JavaModelException the JavaModelException in case it fails
 	 */
 	protected abstract RefactoringStatus verifyDestination(Object selected) throws JavaModelException;
 
@@ -155,5 +161,24 @@ abstract class ReorgUserInputPage extends UserInputWizardPage{
 
 	protected TreeViewer getTreeViewer() {
 		return fViewer;
+	}
+
+	private final class TreeViewerDoubleClickListener implements IDoubleClickListener {
+		public void doubleClick(DoubleClickEvent event) {
+			IStructuredSelection selection= (IStructuredSelection) event.getSelection();
+			Object element= selection.getFirstElement();
+			if (fViewer.isExpandable(element)) {
+				if (fViewer.getExpandedState(element)) {
+					fViewer.collapseToLevel(element, 1);
+				}
+				else {
+					ITreeContentProvider contentProvider= (ITreeContentProvider) fViewer.getContentProvider();
+					Object[] children= contentProvider.getChildren(element);
+					if (children.length > 0) {
+						fViewer.expandToLevel(element, 1);
+					}
+				}
+			}
+		}
 	}
 }

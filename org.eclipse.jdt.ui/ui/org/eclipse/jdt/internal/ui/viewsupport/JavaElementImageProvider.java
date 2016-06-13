@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -176,7 +176,7 @@ public class JavaElementImageProvider {
 	 * @return returns the image descriptor
 	 */
 	public ImageDescriptor getWorkbenchImageDescriptor(IAdaptable adaptable, int flags) {
-		IWorkbenchAdapter wbAdapter= (IWorkbenchAdapter) adaptable.getAdapter(IWorkbenchAdapter.class);
+		IWorkbenchAdapter wbAdapter= adaptable.getAdapter(IWorkbenchAdapter.class);
 		if (wbAdapter == null) {
 			return null;
 		}
@@ -290,7 +290,7 @@ public class JavaElementImageProvider {
 					IJavaProject jp= (IJavaProject)element;
 					if (jp.getProject().isOpen()) {
 						IProject project= jp.getProject();
-						IWorkbenchAdapter adapter= (IWorkbenchAdapter)project.getAdapter(IWorkbenchAdapter.class);
+						IWorkbenchAdapter adapter= project.getAdapter(IWorkbenchAdapter.class);
 						if (adapter != null) {
 							ImageDescriptor result= adapter.getImageDescriptor(project);
 							if (result != null)
@@ -312,7 +312,7 @@ public class JavaElementImageProvider {
 				default:
 					// ignore. Must be a new, yet unknown Java element
 					// give an advanced IWorkbenchAdapter the chance
-					IWorkbenchAdapter wbAdapter= (IWorkbenchAdapter) element.getAdapter(IWorkbenchAdapter.class);
+					IWorkbenchAdapter wbAdapter= element.getAdapter(IWorkbenchAdapter.class);
 					if (wbAdapter != null && !(wbAdapter instanceof JavaWorkbenchAdapter)) { // avoid recursion
 						ImageDescriptor imageDescriptor= wbAdapter.getImageDescriptor(element);
 						if (imageDescriptor != null) {
@@ -366,7 +366,7 @@ public class JavaElementImageProvider {
 						flags|= JavaElementImageDescriptor.ABSTRACT;
 					if (Flags.isFinal(modifiers) || isInterfaceOrAnnotationField(member) || isEnumConstant(member, modifiers))
 						flags|= JavaElementImageDescriptor.FINAL;
-					if (Flags.isStatic(modifiers) || isInterfaceOrAnnotationFieldOrType(member) || isEnumConstant(member, modifiers))
+					if (JdtFlags.isStatic(member))
 						flags|= JavaElementImageDescriptor.STATIC;
 
 					if (Flags.isDeprecated(modifiers))
@@ -420,16 +420,6 @@ public class JavaElementImageProvider {
 	private static boolean isInterfaceOrAnnotationField(IMember element) throws JavaModelException {
 		// always show the final symbol on interface fields
 		if (element.getElementType() == IJavaElement.FIELD) {
-			return JavaModelUtil.isInterfaceOrAnnotation(element.getDeclaringType());
-		}
-		return false;
-	}
-
-	private static boolean isInterfaceOrAnnotationFieldOrType(IMember element) throws JavaModelException {
-		// always show the static symbol on interface fields and types
-		if (element.getElementType() == IJavaElement.FIELD) {
-			return JavaModelUtil.isInterfaceOrAnnotation(element.getDeclaringType());
-		} else if (element.getElementType() == IJavaElement.TYPE && element.getDeclaringType() != null) {
 			return JavaModelUtil.isInterfaceOrAnnotation(element.getDeclaringType());
 		}
 		return false;

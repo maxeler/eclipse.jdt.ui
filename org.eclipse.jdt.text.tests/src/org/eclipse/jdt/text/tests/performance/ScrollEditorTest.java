@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -21,6 +21,8 @@ import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 
+import org.eclipse.jface.util.Util;
+
 import org.eclipse.ui.texteditor.AbstractTextEditor;
 
 public abstract class ScrollEditorTest extends TextPerformanceTestCase {
@@ -33,8 +35,12 @@ public abstract class ScrollEditorTest extends TextPerformanceTestCase {
 
 	private static final String LINE_SCROLLING_FILE= PerformanceTestSetup.TEXT_LAYOUT;
 
-	private static final int[] CTRL_HOME= new int[] { SWT.CTRL, SWT.HOME };
-	private static final int[] CTRL_DOWN= new int[] { SWT.CTRL, SWT.ARROW_DOWN };
+	private static final int[] CTRL_HOME= new int[] { SWT.MOD1, SWT.HOME };
+	/* Ctrl+ARROW_DOWN is "Application windows" on Mac OS X.
+	 * COMMAND+SHIFT+ALT+CTRL+ARROW_DOWN is defined in org.eclipse.jdt.text.tests/plugin.xml */
+	private static final int[] CTRL_DOWN= Util.isMac()
+			? new int[] { SWT.COMMAND, SWT.SHIFT, SWT.ALT, SWT.CTRL, SWT.ARROW_DOWN }
+			: new int[] { SWT.CTRL, SWT.ARROW_DOWN };
 	private static final int[] PG_DOWN= new int[] { SWT.PAGE_DOWN };
 	private static final int[] SHIFT_PG_DOWN= new int[] { SWT.SHIFT, SWT.PAGE_DOWN };
 	private static final int[] DOWN= new int[] { SWT.ARROW_DOWN };
@@ -199,9 +205,8 @@ public abstract class ScrollEditorTest extends TextPerformanceTestCase {
 				// 0: assert that we are at the top and the selection at 0
 				assertTrue("editor must be scrolled to the top before starting", text.getTopIndex() == 0);
 				assertTrue("selection must be at (0,0) before starting", text.getSelection().x == 0 && text.getSelection().y == 0);
-
 				// 1: post scroll events
-				long delay= 3000;
+				long delay= 6000;
 				Timeout timeout= waiter.restart(delay);
 				performanceMeter.start();
 				for (int j= 0; j < operations && !timeout.hasTimedOut(); j++) {
@@ -209,8 +214,8 @@ public abstract class ScrollEditorTest extends TextPerformanceTestCase {
 					SWTEventHelper.pressKeyCodeCombination(display, mode.SCROLL_COMBO, false);
 					runEventQueue(display);
 					// average for select & scroll is 30ms/line
-					// - give it ten time as much to allow for GCs (300ms),
-					// check back every 10 lines == never wait longer than 3s.
+					// - give it 20 times as much to allow for GCs (600ms),
+					// check back every 10 lines == never wait longer than 6s.
 					if (j % 10 == 9)
 						timeout= waiter.restart(delay);
 				}
@@ -219,21 +224,21 @@ public abstract class ScrollEditorTest extends TextPerformanceTestCase {
 				assertFalse("Failed to receive event within " + delay + "ms.", timeout.hasTimedOut());
 
 				// 2: wait until the events have been swallowed
-				timeout= waiter.restart(2000);
+				timeout= waiter.restart(10000);
 				while (!timeout.hasTimedOut() && text.getTopIndex() + visibleLinesInViewport < numberOfLines - 1) {
 					runEventQueue(display);
 				}
 				waiter.hold();
-				assertFalse("Never scrolled to the bottom within 2000ms.\nTopIndex: " + text.getTopIndex() + " visibleLines: " + visibleLinesInViewport + " totalLines: " + numberOfLines + " operations: " + operations, timeout.hasTimedOut());
+				assertFalse("Never scrolled to the bottom within 10000ms.\nTopIndex: " + text.getTopIndex() + " visibleLines: " + visibleLinesInViewport + " totalLines: " + numberOfLines + " operations: " + operations, timeout.hasTimedOut());
 
 				// 3: go back home
-				timeout= waiter.restart(2000);
+				timeout= waiter.restart(10000);
 				SWTEventHelper.pressKeyCodeCombination(display, mode.HOME_COMBO, false);
 				while (!timeout.hasTimedOut() && text.getTopIndex() != 0) {
 					runEventQueue(display);
 				}
 				waiter.hold();
-				assertFalse("Never went back to the top within 2000ms.", timeout.hasTimedOut());
+				assertFalse("Never went back to the top within 10000ms.", timeout.hasTimedOut());
 
 				waiter.hold();
 			}

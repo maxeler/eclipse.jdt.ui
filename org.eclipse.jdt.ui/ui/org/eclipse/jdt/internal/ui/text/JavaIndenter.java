@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -185,7 +185,7 @@ public final class JavaIndenter {
 				// ignore and return default
 			}
 
-			return prefContinuationIndent(); // default
+			return prefContinuationIndentForArrayInitializer(); // default
 		}
 
 		private boolean prefArrayDeepIndent() {
@@ -345,6 +345,15 @@ public final class JavaIndenter {
 		private int prefContinuationIndent() {
 			try {
 				return Integer.parseInt(getCoreFormatterOption(DefaultCodeFormatterConstants.FORMATTER_CONTINUATION_INDENTATION));
+			} catch (NumberFormatException e) {
+				// ignore and return default
+			}
+
+			return 2; // sensible default
+		}
+		private int prefContinuationIndentForArrayInitializer() {
+			try {
+				return Integer.parseInt(getCoreFormatterOption(DefaultCodeFormatterConstants.FORMATTER_CONTINUATION_INDENTATION_FOR_ARRAY_INITIALIZER));
 			} catch (NumberFormatException e) {
 				// ignore and return default
 			}
@@ -1028,10 +1037,14 @@ public final class JavaIndenter {
 					if (isTryWithResources()) {
 						fIndent= fPrefs.prefContinuationIndent;
 						return fPosition;
-					} else {
-						fPosition= pos;
-						return skipToStatementStart(danglingElse, false);
 					}
+					fPosition= pos;
+					if (isSemicolonPartOfEnumBodyDeclaration()) {
+						fIndent= getBlockIndent(false, true);
+						return fPosition;
+					}
+					fPosition= pos;
+					return skipToStatementStart(danglingElse, false);
 				}
 			// scope introduction: special treat who special is
 			case Symbols.TokenLPAREN:
@@ -1081,6 +1094,7 @@ public final class JavaIndenter {
 					return fPosition;
 				}
 				int line= fLine;
+				int rParen= fPosition;
 				if (skipScope(Symbols.TokenLPAREN, Symbols.TokenRPAREN)) {
 					int scope= fPosition;
 					nextToken();
@@ -1093,12 +1107,16 @@ public final class JavaIndenter {
 						return skipToStatementStart(danglingElse, false);
 					}
 					fPosition= scope;
-					if (looksLikeAnonymousTypeDecl()) {
+					if (looksLikeAnonymousTypeDecl(rParen)) {
 						return skipToStatementStart(danglingElse, false);
 					}
 					fPosition= scope;
 					if (looksLikeAnnotation()) {
 						return skipToStatementStart(danglingElse, false);
+					}
+					fPosition= scope;
+					if (looksLikeStringContinuation()) {
+						return fPosition;
 					}
 				}
 				// restore
@@ -1523,6 +1541,8 @@ public final class JavaIndenter {
 				case Symbols.TokenRBRACE:
 				case Symbols.TokenGREATERTHAN:
 					skipScope();
+					startLine= fLine;
+					startPosition= fPosition;
 					break;
 
 				// scope introduction: special treat who special is
@@ -1673,13 +1693,16 @@ public final class JavaIndenter {
 				pos= fPosition; // store
 
 				// special: array initializer
-				if (looksLikeArrayInitializerIntro())
-					if (fPrefs.prefArrayDeepIndent)
+				if (looksLikeArrayInitializerIntro()) {
+					if (fPrefs.prefArrayDeepIndent) {
 						return setFirstElementAlignment(pos, bound);
-					else
+					} else {
 						fIndent= fPrefs.prefArrayIndent;
-				else
+						return pos;
+					}
+				} else {
 					fIndent= fPrefs.prefBlockIndent;
+				}
 
 				// normal: skip to the statement start before the scope introducer
 				// opening braces are often on differently ending indents than e.g. a method definition
@@ -1729,27 +1752,113 @@ public final class JavaIndenter {
 
 
 	/**
-	 * Returns <code>true</code> if the next token received after calling
-	 * <code>nextToken</code> is either an equal sign or an array designator ('[]').
+	 * Returns <code>true</code> if the next token received after calling <code>nextToken</code> is
+	 * either an equal sign or an array designator ('[]') preceded by array creation.
 	 *
 	 * @return <code>true</code> if the next elements look like the start of an array definition
 	 */
 	private boolean looksLikeArrayInitializerIntro() {
 		nextToken();
-		if (fToken == Symbols.TokenEQUAL || skipBrackets()) {
+		if (fToken == Symbols.TokenEQUAL) {
 			return true;
+		}
+
+		if (!skipScope(Symbols.TokenLBRACKET, Symbols.TokenRBRACKET)) {
+			return false;
+		}
+		nextToken();
+		if (fToken == Symbols.TokenIDENT) { // type name
+			nextToken();
+			while (fToken == Symbols.TokenOTHER) { // dot of qualification
+				nextToken();
+				if (fToken != Symbols.TokenIDENT) // qualifying name
+					return false;
+				nextToken();
+			}
+			return fToken == Symbols.TokenNEW;
 		}
 		return false;
 	}
 
 	/**
-	 * Skips over the next <code>if</code> keyword. The current token when calling
-	 * this method must be an <code>else</code> keyword. Returns <code>true</code>
-	 * if a matching <code>if</code> could be found, <code>false</code> otherwise.
-	 * The cursor (<code>fPosition</code>) is set to the offset of the <code>if</code>
-	 * token.
+	 * Returns <code>true</code> if the current position looks like a part of enum declaration
+	 * header. It calls {@link #nextToken} to scan backwards.
 	 *
-	 * @return <code>true</code> if a matching <code>if</code> token was found, <code>false</code> otherwise
+	 * @return <code>true</code> if the current position looks like a part of enum declaration
+	 *         header
+	 * @since 3.11
+	 */
+	private boolean looksLikeEnumDeclaration() {
+		while (true) {
+			nextToken();
+			switch (fToken) {
+				case Symbols.TokenENUM:
+					return true;
+				case Symbols.TokenIDENT:
+				case Symbols.TokenCOMMA:
+				case Symbols.TokenAT:
+					break;
+				case Symbols.TokenOTHER:
+					try {
+						if (fDocument.getChar(fPosition) != '.') {
+							return false;
+						}
+					} catch (BadLocationException e) {
+						return false;
+					}
+					break;
+				case Symbols.TokenRPAREN:
+				case Symbols.TokenRBRACKET:
+				case Symbols.TokenRBRACE:
+				case Symbols.TokenGREATERTHAN:
+					skipScope();
+					break;
+				case Symbols.TokenEOF:
+					return false;
+				default:
+					return false;
+			}
+		}
+	}
+
+	/**
+	 * Checks if the semicolon at the current position is part of enum body declaration.
+	 * 
+	 * @return returns <code>true</code> if the semicolon at the current position is part of enum
+	 *         body declaration
+	 * @since 3.11
+	 */
+	private boolean isSemicolonPartOfEnumBodyDeclaration() {
+		while (true) {
+			nextToken();
+			switch (fToken) {
+				case Symbols.TokenLBRACE:
+					return looksLikeEnumDeclaration();
+				case Symbols.TokenIDENT:
+				case Symbols.TokenCOMMA:
+					break;
+				case Symbols.TokenRPAREN:
+				case Symbols.TokenRBRACKET:
+				case Symbols.TokenRBRACE:
+				case Symbols.TokenGREATERTHAN:
+					skipScope();
+					break;
+				case Symbols.TokenEOF:
+					return false;
+				default:
+					return false;
+			}
+		}
+	}
+
+	/**
+	 * Skips over the next <code>if</code> keyword. The current token when calling this method must
+	 * be an <code>else</code> keyword. Returns <code>true</code> if a matching <code>if</code>
+	 * could be found, <code>false</code> otherwise. The cursor (<code>fPosition</code>) is set to
+	 * the offset of the <code>if</code> token.
+	 *
+	 * @return <code>true</code> if a matching <code>if</code> token was found, <code>false</code>
+	 *         otherwise
 	 */
 	private boolean skipNextIF() {
 		Assert.isTrue(fToken == Symbols.TokenELSE);
@@ -1890,6 +1999,37 @@ public final class JavaIndenter {
 	}
 
 	/**
+	 * Checks whether the current position represents a method call in string continuation. The
+	 * current token should represent the left parenthesis of method call.
+	 * 
+	 * @return <code>true</code> if the current position looks like a method call in string
+	 *         continuation, <code>false</code> otherwise
+	 * @since 3.11
+	 */
+	private boolean looksLikeStringContinuation() {
+		nextToken();
+		if (fToken == Symbols.TokenIDENT) { // method name
+			nextToken();
+			if (fToken == Symbols.TokenGREATERTHAN) { // type arguments
+				skipScope(Symbols.TokenLESSTHAN, Symbols.TokenGREATERTHAN);
+				nextToken();
+			}
+			while (fToken == Symbols.TokenOTHER) { // dot of qualification
+				nextToken();
+				if (fToken != Symbols.TokenIDENT) // qualifying name
+					return false;
+				nextToken();
+			}
+			if (fToken == Symbols.TokenRPAREN) { // cast
+				skipScope(Symbols.TokenLPAREN, Symbols.TokenRPAREN);
+				nextToken();
+			}
+			return fToken == Symbols.TokenPLUS;
+		}
+		return false;
+	}
+
+	/**
 	 * Returns <code>true</code> if the current tokens look like a method
 	 * declaration header (i.e. only the return type and method name). The
 	 * heuristic calls <code>nextToken</code> and expects an identifier
@@ -1912,7 +2052,13 @@ public final class JavaIndenter {
 		if (fToken == Symbols.TokenIDENT) { // method name
 			do nextToken();
 			while (skipBrackets()); // optional brackets for array valued return types
-
+			if (fToken == Symbols.TokenGREATERTHAN) {
+				if (skipScope(Symbols.TokenLESSTHAN, Symbols.TokenGREATERTHAN)) { // parameterized return type
+					nextToken();
+				} else {
+					return false;
+				}
+			}
 			return fToken == Symbols.TokenIDENT; // return type name
 
 		}
@@ -1948,12 +2094,28 @@ public final class JavaIndenter {
 	 * <code>nextToken</code> and expects a possibly qualified identifier (type name) and a new
 	 * keyword
 	 *
+	 * @param rParen offset of the right parenthesis
+	 *
 	 * @return <code>true</code> if the current position looks like a anonymous type declaration
 	 *         header.
 	 */
-	private boolean looksLikeAnonymousTypeDecl() {
-
+	private boolean looksLikeAnonymousTypeDecl(int rParen) {
+		try {
+			int nonWsFwd= fScanner.findNonWhitespaceForwardInAnyPartition(rParen + 1, JavaHeuristicScanner.UNBOUND);
+			if (nonWsFwd == JavaHeuristicScanner.NOT_FOUND || fDocument.getChar(nonWsFwd) != '{') {
+				return false;
+			}
+		} catch (BadLocationException e) {
+			return false;
+		}
 		nextToken();
+		if (fToken == Symbols.TokenGREATERTHAN) {
+			if (skipScope(Symbols.TokenLESSTHAN, Symbols.TokenGREATERTHAN)) { // parameterized type
+				nextToken();
+			} else {
+				return false;
+			}
+		}
 		if (fToken == Symbols.TokenIDENT) { // type name
 			nextToken();
 			while (fToken == Symbols.TokenOTHER) { // dot of qualification

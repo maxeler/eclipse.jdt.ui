@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -16,6 +16,7 @@
  *     Andrew Eisenberg <andrew@eisenberg.as> - [JUnit] Rerun failed first does not work with JUnit4 - https://bugs.eclipse.org/bugs/show_bug.cgi?id=140392
  *     Thirumala Reddy Mutchukota <thirumala@google.com> - [JUnit] Avoid rerun test launch on UI thread - https://bugs.eclipse.org/bugs/show_bug.cgi?id=411841
  *     Andrew Eisenberg <andrew@eisenberg.as> - [JUnit] Add a monospace font option for the junit results view - https://bugs.eclipse.org/bugs/show_bug.cgi?id=411794
+ *     Andrej Zachar <andrej@chocolatejar.eu> - [JUnit] Add a filter for ignored tests - https://bugs.eclipse.org/bugs/show_bug.cgi?id=298603
  *******************************************************************************/
 package org.eclipse.jdt.internal.junit.ui;
 
@@ -219,6 +220,7 @@ public class TestRunnerViewPart extends ViewPart {
 	private IHandlerActivation fRerunFailedFirstActivation;
 
 	private Action fFailuresOnlyFilterAction;
+	private Action fIgnoredOnlyFilterAction;
 	private ScrollLockAction fScrollLockAction;
 	private ToggleOrientationAction[] fToggleOrientationActions;
 	private ShowTestHierarchyAction fShowTestHierarchyAction;
@@ -274,6 +276,11 @@ public class TestRunnerViewPart extends ViewPart {
 	 * @since 3.2
 	 */
 	static final String TAG_FAILURES_ONLY= "failuresOnly"; //$NON-NLS-1$
+
+	/**
+	 * @since 3.8
+	 */
+	static final String TAG_IGNORED_ONLY= "ignoredOnly"; //$NON-NLS-1$
 	/**
 	 * @since 3.4
 	 */
@@ -1026,6 +1033,19 @@ public class TestRunnerViewPart extends ViewPart {
 			setShowFailuresOnly(isChecked());
 		}
 	}
+	
+	private class IgnoredOnlyFilterAction extends Action {
+		public IgnoredOnlyFilterAction() {
+			super(JUnitMessages.TestRunnerViewPart_show_ignored_only, AS_CHECK_BOX);
+			setToolTipText(JUnitMessages.TestRunnerViewPart_show_ignored_only);
+			setImageDescriptor(JUnitPlugin.getImageDescriptor("obj16/testignored.gif")); //$NON-NLS-1$
+		}
+		
+		@Override
+		public void run() {
+			setShowIgnoredOnly(isChecked());
+		}
+	}
 
 	private class ShowTimeAction extends Action {
 
@@ -1143,6 +1163,7 @@ public class TestRunnerViewPart extends ViewPart {
 		memento.putInteger(TAG_ORIENTATION, fOrientation);
 
 		memento.putString(TAG_FAILURES_ONLY, fFailuresOnlyFilterAction.isChecked() ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
+		memento.putString(TAG_IGNORED_ONLY, fIgnoredOnlyFilterAction.isChecked() ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
 		memento.putInteger(TAG_LAYOUT, fLayout);
 		memento.putString(TAG_SHOW_TIME, fShowTimeAction.isChecked() ? "true" : "false"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
@@ -1179,12 +1200,17 @@ public class TestRunnerViewPart extends ViewPart {
 		if (failuresOnly != null)
 			showFailuresOnly= failuresOnly.equals("true"); //$NON-NLS-1$
 
+		String ignoredOnly= memento.getString(TAG_IGNORED_ONLY);
+		boolean showIgnoredOnly= false;
+		if (ignoredOnly != null)
+			showIgnoredOnly= ignoredOnly.equals("true"); //$NON-NLS-1$
+
 		String time= memento.getString(TAG_SHOW_TIME);
 		boolean showTime= true;
 		if (time != null)
 			showTime= time.equals("true"); //$NON-NLS-1$
 
-		setFilterAndLayout(showFailuresOnly, layoutValue);
+		setFilterAndLayout(showFailuresOnly, showIgnoredOnly, layoutValue);
 		setShowExecutionTime(showTime);
 	}
 
@@ -1242,11 +1268,15 @@ public class TestRunnerViewPart extends ViewPart {
 		else {
 			updateViewIcon();
 		}
-		boolean hasErrorsOrFailures= hasErrorsOrFailures();
-		fNextAction.setEnabled(hasErrorsOrFailures);
-		fPreviousAction.setEnabled(hasErrorsOrFailures);
+		updateNextPreviousActions();
 
 		fTestViewer.processChangesInUI();
+	}
+
+	private void updateNextPreviousActions() {
+		boolean hasErrorsOrFailures= !fIgnoredOnlyFilterAction.isChecked() && hasErrorsOrFailures();
+		fNextAction.setEnabled(hasErrorsOrFailures);
+		fPreviousAction.setEnabled(hasErrorsOrFailures);
 	}
 
 	/**
@@ -1557,7 +1587,7 @@ action enablement
 		if (fTestRunSessionListener != null)
 			JUnitCorePlugin.getModel().removeTestRunSessionListener(fTestRunSessionListener);
 
-		IHandlerService handlerService= (IHandlerService) getSite().getWorkbenchWindow().getService(IHandlerService.class);
+		IHandlerService handlerService= getSite().getWorkbenchWindow().getService(IHandlerService.class);
 		handlerService.deactivateHandler(fRerunLastActivation);
 		handlerService.deactivateHandler(fRerunFailedFirstActivation);
 		setActiveTestRunSession(null);
@@ -1768,7 +1798,7 @@ action enablement
 
 		getViewSite().getPage().addPartListener(fPartListener);
 
-		setFilterAndLayout(false, LAYOUT_HIERARCHICAL);
+		setFilterAndLayout(false, false, LAYOUT_HIERARCHICAL);
 		setShowExecutionTime(true);
 		if (fMemento != null) {
 			restoreLayoutState(fMemento);
@@ -1888,7 +1918,7 @@ action enablement
 		fStopAction.setEnabled(false);
 
 		fRerunLastTestAction= new RerunLastAction();
-		IHandlerService handlerService= (IHandlerService) getSite().getWorkbenchWindow().getService(IHandlerService.class);
+		IHandlerService handlerService= getSite().getWorkbenchWindow().getService(IHandlerService.class);
 		IHandler handler = new AbstractHandler() {
 			public Object execute(ExecutionEvent event) throws ExecutionException {
 				fRerunLastTestAction.run();
@@ -1915,6 +1945,7 @@ action enablement
 		fRerunFailedFirstActivation= handlerService.activateHandler(RERUN_FAILED_FIRST_COMMAND, handler);
 
 		fFailuresOnlyFilterAction= new FailuresOnlyFilterAction();
+		fIgnoredOnlyFilterAction= new IgnoredOnlyFilterAction();
 
 		fScrollLockAction= new ScrollLockAction(this);
 		fScrollLockAction.setChecked(!fAutoScroll);
@@ -1931,6 +1962,7 @@ action enablement
 		toolBar.add(fNextAction);
 		toolBar.add(fPreviousAction);
 		toolBar.add(fFailuresOnlyFilterAction);
+		toolBar.add(fIgnoredOnlyFilterAction);
 		toolBar.add(fScrollLockAction);
 		toolBar.add(new Separator());
 		toolBar.add(fRerunLastTestAction);
@@ -1951,6 +1983,7 @@ action enablement
 		viewMenu.add(new Separator());
 
 		viewMenu.add(fFailuresOnlyFilterAction);
+		viewMenu.add(fIgnoredOnlyFilterAction);
 
 
 		fActivateOnErrorAction= new ActivateOnErrorAction();
@@ -2094,7 +2127,7 @@ action enablement
 						// reset the container
 						tmp.setAttribute(JUnitLaunchConfigurationConstants.ATTR_TEST_CONTAINER, ""); //$NON-NLS-1$
 						if (testName != null) {
-							tmp.setAttribute(JUnitLaunchConfigurationConstants.ATTR_TEST_METHOD_NAME, testName);
+							tmp.setAttribute(JUnitLaunchConfigurationConstants.ATTR_TEST_NAME, testName);
 						}
 						relaunch(tmp, launchMode);
 						return;
@@ -2176,18 +2209,24 @@ action enablement
 
 
 	void setShowFailuresOnly(boolean failuresOnly) {
-		setFilterAndLayout(failuresOnly, fLayout);
+		setFilterAndLayout(failuresOnly, false /*ignoredOnly must be off*/, fLayout);
+	}
+	
+	void setShowIgnoredOnly(boolean ignoredOnly) {
+		setFilterAndLayout( false /*failuresOnly must be off*/, ignoredOnly, fLayout);
 	}
 
 	private void setLayoutMode(int mode) {
-		setFilterAndLayout(fFailuresOnlyFilterAction.isChecked(), mode);
+		setFilterAndLayout(fFailuresOnlyFilterAction.isChecked(), fIgnoredOnlyFilterAction.isChecked(), mode);
 	}
 
-	private void setFilterAndLayout(boolean failuresOnly, int layoutMode) {
+	private void setFilterAndLayout(boolean failuresOnly, boolean ignoredOnly,  int layoutMode) {
 		fShowTestHierarchyAction.setChecked(layoutMode == LAYOUT_HIERARCHICAL);
 		fLayout= layoutMode;
 		fFailuresOnlyFilterAction.setChecked(failuresOnly);
-		fTestViewer.setShowFailuresOnly(failuresOnly, layoutMode);
+		fIgnoredOnlyFilterAction.setChecked(ignoredOnly);
+		fTestViewer.setShowFailuresOrIgnoredOnly(failuresOnly, ignoredOnly, layoutMode);
+		updateNextPreviousActions();
 	}
 
 	private void setShowExecutionTime(boolean showTime) {

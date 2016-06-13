@@ -341,7 +341,7 @@ public abstract class AbstractInfoView extends ViewPart implements ISelectionLis
 		if (action != null)
 			actionBars.setGlobalActionHandler(ActionFactory.SELECT_ALL.getId(), action);
 
-		IHandlerService handlerService= (IHandlerService) getSite().getService(IHandlerService.class);
+		IHandlerService handlerService= getSite().getService(IHandlerService.class);
 		handlerService.activateHandler(IWorkbenchCommandConstants.NAVIGATE_TOGGLE_LINK_WITH_EDITOR, new ActionHandler(fToggleLinkAction));
 	}
 
@@ -577,7 +577,7 @@ public abstract class AbstractInfoView extends ViewPart implements ISelectionLis
 
 		IJavaElement je= null;
 		if (element instanceof IAdaptable)
-			je= (IJavaElement)((IAdaptable)element).getAdapter(IJavaElement.class);
+			je= ((IAdaptable)element).getAdapter(IJavaElement.class);
 
 		if (je != null && je.exists())
 			return je;
@@ -827,14 +827,14 @@ public abstract class AbstractInfoView extends ViewPart implements ISelectionLis
 	 * 
 	 * @since 3.9
 	 */
-	private static final String SYNCED_GIF= "synced.gif"; //$NON-NLS-1$
+	private static final String SYNCED_GIF= "synced.png"; //$NON-NLS-1$
 
 	/**
 	 * Name of the link with selection icon when the view and selection is out of sync.
 	 * 
 	 * @since 3.9
 	 */
-	private static final String SYNC_BROKEN_GIF= "sync_broken.gif"; //$NON-NLS-1$
+	private static final String SYNC_BROKEN_GIF= "sync_broken.png"; //$NON-NLS-1$
 
 
 	/**

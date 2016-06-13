@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@
  *     Genady Beryozkin <eclipse@genady.org> - [misc] Display values for constant fields in the Javadoc view - https://bugs.eclipse.org/bugs/show_bug.cgi?id=204914
  *     Brock Janiczak <brockj@tpg.com.au> - [implementation] Streams not being closed in Javadoc views - https://bugs.eclipse.org/bugs/show_bug.cgi?id=214854
  *     Benjamin Muskalla <bmuskalla@innoopract.com> - [javadoc view] NPE on enumerations - https://bugs.eclipse.org/bugs/show_bug.cgi?id=223586
+ *     Stephan Herrmann - Contribution for Bug 403917 - [1.8] Render TYPE_USE annotations in Javadoc hover/view
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.infoviews;
 
@@ -108,7 +109,9 @@ import org.eclipse.jdt.core.IPackageDeclaration;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
+import org.eclipse.jdt.core.ISourceReference;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeParameter;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
@@ -145,8 +148,10 @@ import org.eclipse.jdt.internal.ui.actions.SimpleSelectionProvider;
 import org.eclipse.jdt.internal.ui.javaeditor.ASTProvider;
 import org.eclipse.jdt.internal.ui.javaeditor.JavaEditor;
 import org.eclipse.jdt.internal.ui.text.java.hover.JavadocHover;
+import org.eclipse.jdt.internal.ui.text.java.hover.JavadocHover.FallbackInformationPresenter;
 import org.eclipse.jdt.internal.ui.text.javadoc.JavadocContentAccess2;
 import org.eclipse.jdt.internal.ui.viewsupport.BasicElementLabels;
+import org.eclipse.jdt.internal.ui.viewsupport.BindingLinkedLabelComposer;
 import org.eclipse.jdt.internal.ui.viewsupport.JavaElementLinks;
 
 
@@ -374,12 +379,6 @@ public class JavadocView extends AbstractInfoView {
 
 	// see https://bugs.eclipse.org/bugs/show_bug.cgi?id=73558
 	private static final boolean WARNING_DIALOG_ENABLED= false;
-
-	/** Flags used to render a label in the text widget. */
-	private static final long LABEL_FLAGS=  JavaElementLabels.ALL_FULLY_QUALIFIED
-		| JavaElementLabels.M_PRE_RETURNTYPE | JavaElementLabels.M_PARAMETER_ANNOTATIONS | JavaElementLabels.M_PARAMETER_TYPES | JavaElementLabels.M_PARAMETER_NAMES | JavaElementLabels.M_EXCEPTIONS
-		| JavaElementLabels.F_PRE_TYPE_SIGNATURE | JavaElementLabels.T_TYPE_PARAMETERS;
-
 
 	/** The HTML widget. */
 	private Browser fBrowser;
@@ -622,7 +621,7 @@ public class JavadocView extends AbstractInfoView {
 		if (!fIsUsingBrowserWidget) {
 			fText= new StyledText(parent, SWT.V_SCROLL | SWT.H_SCROLL);
 			fText.setEditable(false);
-			fPresenter= new HTMLTextPresenter(false);
+			fPresenter= new FallbackInformationPresenter();
 
 			fText.addControlListener(new ControlAdapter() {
 				/*
@@ -1053,7 +1052,10 @@ public class JavadocView extends AbstractInfoView {
 				try {
 					boolean isBinary= root.getKind() == IPackageFragmentRoot.K_BINARY;
 					if (content != null) {
-						base= JavaDocLocations.getBaseURL(curr, isBinary);
+						base= JavadocContentAccess2.extractBaseURL(content);
+						if (base == null) {
+							base= JavaDocLocations.getBaseURL(curr, isBinary);
+						}
 						reader= new StringReader(content);
 					} else if (reader == null) {
 						String explanationForMissingJavadoc= JavaDocLocations.getExplanationForMissingJavadoc(curr, root);
@@ -1068,22 +1070,29 @@ public class JavadocView extends AbstractInfoView {
 				if (reader != null) {
 					HTMLPrinter.addParagraph(buffer, reader);
 				}
-			} else if (curr instanceof IMember) {
-				final IMember member= (IMember) curr;
+			} else if (curr instanceof IMember || curr instanceof ILocalVariable || curr instanceof ITypeParameter) {
+				final IJavaElement element= curr;
 
 				String constantValue= null;
-				if (member instanceof IField) {
-					constantValue= computeFieldConstant(activePart, selection, (IField) member, monitor);
+				if (element instanceof IField) {
+					constantValue= computeFieldConstant(activePart, selection, (IField) element, monitor);
 					if (constantValue != null)
 						constantValue= HTMLPrinter.convertToHTMLContentWithWhitespace(constantValue);
 				}
 
-				HTMLPrinter.addSmallHeader(buffer, getInfoText(member, constantValue, true));
+				HTMLPrinter.addSmallHeader(buffer, getInfoText(element, constantValue, true));
 
 				try {
-					ISourceRange nameRange= ((IMember) curr).getNameRange();
+					ISourceRange nameRange= ((ISourceReference) curr).getNameRange();
 					if (SourceRange.isAvailable(nameRange)) {
-						ITypeRoot typeRoot= ((IMember) curr).getTypeRoot();
+						ITypeRoot typeRoot;
+						if (element instanceof ILocalVariable) {
+							typeRoot= ((ILocalVariable) curr).getTypeRoot();
+						} else if (element instanceof ITypeParameter) {
+							typeRoot= ((ITypeParameter) curr).getTypeRoot();
+						} else {
+							typeRoot= ((IMember) curr).getTypeRoot();
+						}
 						Region hoverRegion= new Region(nameRange.getOffset(), nameRange.getLength());
 						buffer.append("<br>"); //$NON-NLS-1$
 						JavadocHover.addAnnotations(buffer, curr, typeRoot, hoverRegion);
@@ -1094,33 +1103,35 @@ public class JavadocView extends AbstractInfoView {
 
 				Reader reader= null;
 				try {
-					String content= JavadocContentAccess2.getHTMLContent(member, true);
-					IPackageFragmentRoot root= (IPackageFragmentRoot) member.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
+					String content= JavadocContentAccess2.getHTMLContent(element, true);
+					IPackageFragmentRoot root= (IPackageFragmentRoot) element.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
 					if (content != null) {
-						base= JavaDocLocations.getBaseURL(member, member.isBinary());
+						IMember member;
+						if (element instanceof ILocalVariable) {
+							member= ((ILocalVariable) element).getDeclaringMember();
+						} else if (element instanceof ITypeParameter) {
+							member= ((ITypeParameter) element).getDeclaringMember();
+						} else {
+							member= (IMember) element;
+						}
+						base= JavadocContentAccess2.extractBaseURL(content);
+						if (base == null) {
+							base= JavaDocLocations.getBaseURL(member, member.isBinary());
+						}
 						reader= new StringReader(content);
 					} else {
-						String explanationForMissingJavadoc= JavaDocLocations.getExplanationForMissingJavadoc(member, root);
+						String explanationForMissingJavadoc= JavaDocLocations.getExplanationForMissingJavadoc(element, root);
 						if (explanationForMissingJavadoc != null) {
 							reader= new StringReader(explanationForMissingJavadoc);
 						}
 					}
-				} catch (JavaModelException ex) {
+				} catch (CoreException ex) {
 					reader= new StringReader(JavaDocLocations.handleFailedJavadocFetch(ex));
 				}
 				if (reader != null) {
 					HTMLPrinter.addParagraph(buffer, reader);
 				}
 
-			} else if (curr.getElementType() == IJavaElement.LOCAL_VARIABLE || curr.getElementType() == IJavaElement.TYPE_PARAMETER) {
-				HTMLPrinter.addSmallHeader(buffer, getInfoText(curr, null, true));
-				if (curr instanceof ILocalVariable) {
-					ISourceRange nameRange= ((ILocalVariable) curr).getNameRange();
-					ITypeRoot typeRoot= ((ILocalVariable) curr).getTypeRoot();
-					Region hoverRegion= new Region(nameRange.getOffset(), nameRange.getLength());
-					buffer.append("<br>"); //$NON-NLS-1$
-					JavadocHover.addAnnotations(buffer, curr, typeRoot, hoverRegion);
-				}
 			}
 		}
 
@@ -1146,22 +1157,22 @@ public class JavadocView extends AbstractInfoView {
 	 * @return a string containing the member's label
 	 */
 	private String getInfoText(IJavaElement member, String constantValue, boolean allowImage) {
-		StringBuffer label= new StringBuffer(JavaElementLinks.getElementLabel(member, getHeaderFlags(member)));
+		long flags= JavadocHover.getHeaderFlags(member);
+		IBinding binding= JavadocHover.getHoverBinding(member, null);
+		StringBuffer label;
+		if (binding != null) {
+			label= new StringBuffer();
+			// setting haveSource to false lets the JavadocView *always* show qualified type names,
+			// would need to track the source of our input to distinguish classfile/compilationUnit:
+			boolean haveSource= false;
+			new BindingLinkedLabelComposer(member, label, haveSource).appendBindingLabel(binding, flags);
+		} else {
+			label= new StringBuffer(JavaElementLinks.getElementLabel(member, flags));
+		}
 		if (member.getElementType() == IJavaElement.FIELD && constantValue != null) {
 			label.append(constantValue);
 		}
 		return JavadocHover.getImageAndLabel(member, allowImage, label.toString());
-	}
-
-
-	private long getHeaderFlags(IJavaElement element) {
-		switch (element.getElementType()) {
-			case IJavaElement.PACKAGE_FRAGMENT:
-			case IJavaElement.PACKAGE_DECLARATION:
-				return LABEL_FLAGS ^ JavaElementLabels.ALL_FULLY_QUALIFIED;
-			default:
-				return LABEL_FLAGS;
-		}
 	}
 
 	/*

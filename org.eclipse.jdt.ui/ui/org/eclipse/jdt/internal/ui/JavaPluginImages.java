@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,9 +8,13 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Ferenc Hechler, ferenc_hechler@users.sourceforge.net - 83258 [jar exporter] Deploy java application as executable jar
+ *     Frits Jalvingh <jal@etc.to> - Contribution for Bug 459831 - [launching] Support attaching external annotations to a JRE container
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -53,6 +57,7 @@ public class JavaPluginImages {
 
 	/*
 	 * Keys for images available from the Java-UI plug-in image registry.
+	 * Caveat (bug 465521): Can't use *.png in all existing keys, since some of them are made API via org.eclipse.jdt.ui.ISharedImages!
 	 */
 	public static final String IMG_MISC_PUBLIC= NAME_PREFIX + "methpub_obj.gif"; 			//$NON-NLS-1$
 	public static final String IMG_MISC_PROTECTED= NAME_PREFIX + "methpro_obj.gif"; 		//$NON-NLS-1$
@@ -135,6 +140,7 @@ public class JavaPluginImages {
 	public static final String IMG_OBJS_LIBRARY= NAME_PREFIX + "library_obj.gif"; 		//$NON-NLS-1$
 
 	public static final String IMG_OBJS_JAVADOCTAG= NAME_PREFIX + "jdoc_tag_obj.gif"; 	//$NON-NLS-1$
+	public static final String IMG_OBJS_EXTERNAL_ANNOTATIONS = NAME_PREFIX + "external_annotation_location_attrib.gif"; 	//$NON-NLS-1$
 	public static final String IMG_OBJS_HTMLTAG= NAME_PREFIX + "html_tag_obj.gif"; 		//$NON-NLS-1$
 
 	public static final String IMG_OBJS_TEMPLATE= NAME_PREFIX + "template_obj.gif"; 		//$NON-NLS-1$
@@ -171,18 +177,18 @@ public class JavaPluginImages {
 	/*
 	 * Set of predefined Image Descriptors.
 	 */
-	public static final ImageDescriptor DESC_VIEW_ERRORWARNING_TAB= createUnManaged(T_EVIEW, "errorwarning_tab.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_VIEW_CLASSFILEGENERATION_TAB= createUnManaged(T_EVIEW, "classfilegeneration_tab.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_VIEW_JDKCOMPLIANCE_TAB= createUnManaged(T_EVIEW, "jdkcompliance_tab.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_VIEW_ERRORWARNING_TAB= createUnManaged(T_EVIEW, "errorwarning_tab.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_VIEW_CLASSFILEGENERATION_TAB= createUnManaged(T_EVIEW, "classfilegeneration_tab.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_VIEW_JDKCOMPLIANCE_TAB= createUnManaged(T_EVIEW, "jdkcompliance_tab.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_ELCL_FILTER= createUnManaged(T_ELCL, "filter_ps.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_DLCL_FILTER= createUnManaged(T_DLCL, "filter_ps.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_FILTER= createUnManaged(T_ELCL, "filter_ps.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_DLCL_FILTER= createUnManaged(T_DLCL, "filter_ps.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_ELCL_CODE_ASSIST= createUnManaged(T_ELCL, "metharg_obj.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_DLCL_CODE_ASSIST= createUnManaged(T_DLCL, "metharg_obj.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_CODE_ASSIST= createUnManaged(T_ELCL, "metharg_obj.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_DLCL_CODE_ASSIST= createUnManaged(T_DLCL, "metharg_obj.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_ELCL_VIEW_MENU= createManaged(T_ELCL, "view_menu.gif", IMG_ELCL_VIEW_MENU); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_DLCL_VIEW_MENU= createManaged(T_DLCL, "view_menu.gif", IMG_DLCL_VIEW_MENU); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_VIEW_MENU= createManaged(T_ELCL, "view_menu.png", IMG_ELCL_VIEW_MENU); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_DLCL_VIEW_MENU= createManaged(T_DLCL, "view_menu.png", IMG_DLCL_VIEW_MENU); //$NON-NLS-1$
 
 	public static final ImageDescriptor DESC_MISC_PUBLIC= createManagedFromKey(T_OBJ, IMG_MISC_PUBLIC);
 	public static final ImageDescriptor DESC_MISC_PROTECTED= createManagedFromKey(T_OBJ, IMG_MISC_PROTECTED);
@@ -194,8 +200,8 @@ public class JavaPluginImages {
 	public static final ImageDescriptor DESC_FIELD_PRIVATE= createManagedFromKey(T_OBJ, IMG_FIELD_PRIVATE);
 	public static final ImageDescriptor DESC_FIELD_DEFAULT= createManagedFromKey(T_OBJ, IMG_FIELD_DEFAULT);
 
-	public static final ImageDescriptor DESC_MENU_SHIFT_RIGHT= createUnManaged(T_ETOOL, "shift_r_edit.gif"); 	//$NON-NLS-1$
-	public static final ImageDescriptor DESC_MENU_SHIFT_LEFT= createUnManaged(T_ETOOL, "shift_l_edit.gif"); 	//$NON-NLS-1$
+	public static final ImageDescriptor DESC_MENU_SHIFT_RIGHT= createUnManaged(T_ETOOL, "shift_r_edit.png"); 	//$NON-NLS-1$
+	public static final ImageDescriptor DESC_MENU_SHIFT_LEFT= createUnManaged(T_ETOOL, "shift_l_edit.png"); 	//$NON-NLS-1$
 
 	public static final ImageDescriptor DESC_OBJS_GHOST= createManagedFromKey(T_OBJ, IMG_OBJS_GHOST);
 	public static final ImageDescriptor DESC_OBJS_PACKDECL= createManagedFromKey(T_OBJ, IMG_OBJS_PACKDECL);
@@ -208,8 +214,8 @@ public class JavaPluginImages {
 	public static final ImageDescriptor DESC_OBJS_CUNIT_RESOURCE= createManagedFromKey(T_OBJ, IMG_OBJS_CUNIT_RESOURCE);
 	public static final ImageDescriptor DESC_OBJS_CFILE= createManagedFromKey(T_OBJ, IMG_OBJS_CFILE);
 	public static final ImageDescriptor DESC_OBJS_CFILECLASS= createManagedFromKey(T_OBJ, IMG_OBJS_CFILECLASS);
-	public static final ImageDescriptor DESC_ELCL_CLEAR= createUnManaged(T_ELCL, "clear_co.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_CLEAR= createUnManaged(T_DLCL, "clear_co.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_CLEAR= createUnManaged(T_ELCL, "clear_co.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_CLEAR= createUnManaged(T_DLCL, "clear_co.png"); //$NON-NLS-1$
 	public static final ImageDescriptor DESC_OBJS_CFILEINT= createManagedFromKey(T_OBJ, IMG_OBJS_CFILEINT);
 	public static final ImageDescriptor DESC_OBJS_PACKAGE= createManagedFromKey(T_OBJ, IMG_OBJS_PACKAGE);
 	public static final ImageDescriptor DESC_OBJS_EMPTY_LOGICAL_PACKAGE= createManagedFromKey(T_OBJ, IMG_OBJS_EMPTY_LOGICAL_PACKAGE);
@@ -281,18 +287,18 @@ public class JavaPluginImages {
 	public static final ImageDescriptor DESC_OBJS_FIXABLE_PROBLEM= createManagedFromKey(T_OBJ, IMG_OBJS_FIXABLE_PROBLEM);
 	public static final ImageDescriptor DESC_OBJS_FIXABLE_ERROR= createManagedFromKey(T_OBJ, IMG_OBJS_FIXABLE_ERROR);
 
-	// public static final ImageDescriptor DESC_OBJS_SNIPPET_EVALUATING= createManaged(T_OBJ, IMG_OBJS_SNIPPET_EVALUATING);
+	public static final ImageDescriptor DESC_OBJS_DEFAULT_CHANGE= createUnManaged(T_OBJ, "change.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_OBJS_DEFAULT_CHANGE= createUnManaged(T_OBJ, "change.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_EXCLUSION_FILTER_ATTRIB= createUnManaged(T_OBJ, "exclusion_filter_attrib.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_INCLUSION_FILTER_ATTRIB= createUnManaged(T_OBJ, "inclusion_filter_attrib.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_OBJS_OUTPUT_FOLDER_ATTRIB= createUnManaged(T_OBJ, "output_folder_attrib.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_SOURCE_ATTACH_ATTRIB= createUnManaged(T_OBJ, "source_attach_attrib.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_JAVADOC_LOCATION_ATTRIB= createUnManaged(T_OBJ, "javadoc_location_attrib.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_OBJS_EXCLUSION_FILTER_ATTRIB= createUnManaged(T_OBJ, "exclusion_filter_attrib.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OBJS_INCLUSION_FILTER_ATTRIB= createUnManaged(T_OBJ, "inclusion_filter_attrib.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_OBJS_OUTPUT_FOLDER_ATTRIB= createUnManaged(T_OBJ, "output_folder_attrib.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OBJS_SOURCE_ATTACH_ATTRIB= createUnManaged(T_OBJ, "source_attach_attrib.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OBJS_JAVADOC_LOCATION_ATTRIB= createUnManaged(T_OBJ, "javadoc_location_attrib.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_EXTERNAL_ANNOTATION_LOCATION_ATTRIB= createManagedFromKey(T_OBJ, IMG_OBJS_EXTERNAL_ANNOTATIONS);
 
 	public static final ImageDescriptor DESC_OBJS_ACCESSRULES_ATTRIB= createManagedFromKey(T_OBJ, IMG_OBJS_ACCESSRULES_ATTRIB);
-	public static final ImageDescriptor DESC_OBJS_NATIVE_LIB_PATH_ATTRIB= createUnManaged(T_OBJ, "native_lib_path_attrib.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_NATIVE_LIB_PATH_ATTRIB= createUnManaged(T_OBJ, "native_lib_path_attrib.png"); //$NON-NLS-1$
 
 	public static final ImageDescriptor DESC_OBJS_REFACTORING_FATAL= createManagedFromKey(T_OBJ, IMG_OBJS_REFACTORING_FATAL);
 	public static final ImageDescriptor DESC_OBJS_REFACTORING_ERROR= createManagedFromKey(T_OBJ, IMG_OBJS_REFACTORING_ERROR);
@@ -305,7 +311,7 @@ public class JavaPluginImages {
 
 	public static final ImageDescriptor DESC_OBJS_UNKNOWN= createManagedFromKey(T_OBJ, IMG_OBJS_UNKNOWN);
 
-	public static final ImageDescriptor DESC_OBJS_TYPE_SEPARATOR= createUnManaged(T_OBJ, "type_separator.gif");  //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJS_TYPE_SEPARATOR= createUnManaged(T_OBJ, "type_separator.png");  //$NON-NLS-1$
 
 	public static final ImageDescriptor DESC_OBJS_SEARCH_READACCESS= createManagedFromKey(T_OBJ, IMG_OBJS_SEARCH_READACCESS);
 	public static final ImageDescriptor DESC_OBJS_SEARCH_WRITEACCESS= createManagedFromKey(T_OBJ, IMG_OBJS_SEARCH_WRITEACCESS);
@@ -315,94 +321,89 @@ public class JavaPluginImages {
 
 	public static final ImageDescriptor DESC_OBJS_HELP= createManagedFromKey(T_ELCL, IMG_OBJS_HELP);
 
-    public static final ImageDescriptor DESC_ELCL_ADD_TO_BP= createUnManaged(T_ELCL, "add_to_buildpath.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_REMOVE_FROM_BP= createUnManaged(T_ELCL, "remove_from_buildpath.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_INCLUSION= createUnManaged(T_ELCL, "inclusion_filter_attrib.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_EXCLUSION= createUnManaged(T_ELCL, "exclusion_filter_attrib.gif"); //$NON-NLS-1$
-//    public static final ImageDescriptor DESC_ELCL_INCLUSION_UNDO= createUnManaged(T_ELCL, "inclusion_filter_attrib_undo.gif"); //$NON-NLS-1$
-//    public static final ImageDescriptor DESC_ELCL_EXCLUSION_UNDO= createUnManaged(T_ELCL, "exclusion_filter_attrib_undo.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_ADD_TO_BP= createUnManaged(T_ELCL, "add_to_buildpath.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_REMOVE_FROM_BP= createUnManaged(T_ELCL, "remove_from_buildpath.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_INCLUSION= createUnManaged(T_ELCL, "inclusion_filter_attrib.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_EXCLUSION= createUnManaged(T_ELCL, "exclusion_filter_attrib.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_ADD_TO_BP= createUnManaged(T_DLCL, "add_to_buildpath.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_REMOVE_FROM_BP= createUnManaged(T_DLCL, "remove_from_buildpath.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_INCLUSION= createUnManaged(T_DLCL, "inclusion_filter_attrib.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_EXCLUSION= createUnManaged(T_DLCL, "exclusion_filter_attrib.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_OUTPUT_FOLDER_ATTRIB= createUnManaged(T_DLCL, "output_folder_attrib.gif"); //$NON-NLS-1$
-//    public static final ImageDescriptor DESC_DLCL_INCLUSION_UNDO= createUnManaged(T_DLCL, "inclusion_filter_attrib_undo.gif"); //$NON-NLS-1$
-//    public static final ImageDescriptor DESC_DLCL_EXCLUSION_UNDO= createUnManaged(T_DLCL, "exclusion_filter_attrib_undo.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_ADD_TO_BP= createUnManaged(T_DLCL, "add_to_buildpath.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_REMOVE_FROM_BP= createUnManaged(T_DLCL, "remove_from_buildpath.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_INCLUSION= createUnManaged(T_DLCL, "inclusion_filter_attrib.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_EXCLUSION= createUnManaged(T_DLCL, "exclusion_filter_attrib.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_ADD_LINKED_SOURCE_TO_BUILDPATH= createUnManaged(T_DLCL, "add_linked_source_to_buildpath.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_ADD_LINKED_SOURCE_TO_BUILDPATH= createUnManaged(T_ELCL, "add_linked_source_to_buildpath.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_ADD_LINKED_SOURCE_TO_BUILDPATH= createUnManaged(T_DLCL, "add_linked_source_to_buildpath.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_ADD_LINKED_SOURCE_TO_BUILDPATH= createUnManaged(T_ELCL, "add_linked_source_to_buildpath.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_CONFIGURE_BUILDPATH= createUnManaged(T_DLCL, "configure_build_path.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_CONFIGURE_BUILDPATH= createUnManaged(T_ELCL, "configure_build_path.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_CONFIGURE_BUILDPATH= createUnManaged(T_DLCL, "configure_build_path.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_CONFIGURE_BUILDPATH= createUnManaged(T_ELCL, "configure_build_path.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_DLCL_CONFIGURE_ANNOTATIONS= createUnManaged(T_DLCL, "configure_annotations.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_ELCL_CONFIGURE_ANNOTATIONS= createUnManaged(T_ELCL, "configure_annotations.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_DLCL_CONFIGURE_ANNOTATIONS= createUnManaged(T_DLCL, "configure_annotations.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_CONFIGURE_ANNOTATIONS= createUnManaged(T_ELCL, "configure_annotations.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_CONFIGURE_BUILDPATH_FILTERS= createUnManaged(T_DLCL, "configure_buildpath_filters.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_CONFIGURE_BUILDPATH_FILTERS= createUnManaged(T_ELCL, "configure_buildpath_filters.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_CONFIGURE_BUILDPATH_FILTERS= createUnManaged(T_DLCL, "configure_buildpath_filters.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_CONFIGURE_BUILDPATH_FILTERS= createUnManaged(T_ELCL, "configure_buildpath_filters.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_CONFIGURE_OUTPUT_FOLDER= createUnManaged(T_DLCL, "configure_output_folder.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_CONFIGURE_OUTPUT_FOLDER= createUnManaged(T_ELCL, "configure_output_folder.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_CONFIGURE_OUTPUT_FOLDER= createUnManaged(T_DLCL, "configure_output_folder.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_CONFIGURE_OUTPUT_FOLDER= createUnManaged(T_ELCL, "configure_output_folder.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_CONFIGURE_PROBLEM_SEVERITIES= createUnManaged(T_DLCL, "configure_problem_severity.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_ELCL_CONFIGURE_PROBLEM_SEVERITIES= createUnManaged(T_ELCL, "configure_problem_severity.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_CONFIGURE_PROBLEM_SEVERITIES= createUnManaged(T_DLCL, "configure_problem_severity.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_CONFIGURE_PROBLEM_SEVERITIES= createUnManaged(T_ELCL, "configure_problem_severity.png"); //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_EXCLUDE_FROM_BUILDPATH= createUnManaged(T_DLCL, "exclude_from_buildpath.gif");  //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_EXCLUDE_FROM_BUILDPATH= createUnManaged(T_ELCL, "exclude_from_buildpath.gif");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_EXCLUDE_FROM_BUILDPATH= createUnManaged(T_DLCL, "exclude_from_buildpath.png");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_EXCLUDE_FROM_BUILDPATH= createUnManaged(T_ELCL, "exclude_from_buildpath.png");  //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_INCLUDE_ON_BUILDPATH= createUnManaged(T_DLCL, "include_on_buildpath.gif");  //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_INCLUDE_ON_BUILDPATH= createUnManaged(T_ELCL, "include_on_buildpath.gif");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_INCLUDE_ON_BUILDPATH= createUnManaged(T_DLCL, "include_on_buildpath.png");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_INCLUDE_ON_BUILDPATH= createUnManaged(T_ELCL, "include_on_buildpath.png");  //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_ADD_AS_SOURCE_FOLDER= createUnManaged(T_DLCL, "add_as_source_folder.gif");  //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_ADD_AS_SOURCE_FOLDER= createUnManaged(T_ELCL, "add_as_source_folder.gif");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_ADD_AS_SOURCE_FOLDER= createUnManaged(T_DLCL, "add_as_source_folder.png");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_ADD_AS_SOURCE_FOLDER= createUnManaged(T_ELCL, "add_as_source_folder.png");  //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_REMOVE_AS_SOURCE_FOLDER= createUnManaged(T_DLCL, "remove_as_source_folder.gif");  //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_REMOVE_AS_SOURCE_FOLDER= createUnManaged(T_ELCL, "remove_as_source_folder.gif");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_REMOVE_AS_SOURCE_FOLDER= createUnManaged(T_DLCL, "remove_as_source_folder.png");  //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_REMOVE_AS_SOURCE_FOLDER= createUnManaged(T_ELCL, "remove_as_source_folder.png");  //$NON-NLS-1$
 
-    public static final ImageDescriptor DESC_DLCL_COPY_QUALIFIED_NAME= createUnManaged(T_DLCL, "cpyqual_menu.gif"); //$NON-NLS-1$
-    public static final ImageDescriptor DESC_ELCL_COPY_QUALIFIED_NAME= createUnManaged(T_ELCL, "cpyqual_menu.gif"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_DLCL_COPY_QUALIFIED_NAME= createUnManaged(T_DLCL, "cpyqual_menu.png"); //$NON-NLS-1$
+    public static final ImageDescriptor DESC_ELCL_COPY_QUALIFIED_NAME= createUnManaged(T_ELCL, "cpyqual_menu.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_DLCL_OPEN_BROWSER= createUnManaged(T_DLCL, "open_browser.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_DLCL_OPEN_BROWSER= createUnManaged(T_DLCL, "open_browser.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_ELCL_OPEN_BROWSER= createUnManaged(T_ELCL, "open_browser.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_OPEN_BROWSER= createUnManaged(T_ELCL, "open_browser.png"); //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_OBJ_OVERRIDES= createUnManaged(T_OBJ, "over_co.gif");  					//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OBJ_IMPLEMENTS= createUnManaged(T_OBJ, "implm_co.gif");  				//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJ_OVERRIDES= createUnManaged(T_OBJ, "over_co.png");  					//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OBJ_IMPLEMENTS= createUnManaged(T_OBJ, "implm_co.png");  				//$NON-NLS-1$
 
 	// Image descriptor used for default methods and annotation type elements with a default value
-	public static final ImageDescriptor DESC_OVR_ANNOTATION_DEFAULT_METHOD= createUnManagedCached(T_OVR, "default_co.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_STATIC= createUnManagedCached(T_OVR, "static_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_FINAL= createUnManagedCached(T_OVR, "final_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_ABSTRACT= createUnManagedCached(T_OVR, "abstract_co.gif"); 					//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_SYNCH= createUnManagedCached(T_OVR, "synch_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_VOLATILE= createUnManagedCached(T_OVR, "volatile_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_TRANSIENT= createUnManagedCached(T_OVR, "transient_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_NATIVE= createUnManagedCached(T_OVR, "native_co.gif"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ANNOTATION_DEFAULT_METHOD= createUnManagedCached(T_OVR, "default_co.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_STATIC= createUnManagedCached(T_OVR, "static_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_FINAL= createUnManagedCached(T_OVR, "final_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ABSTRACT= createUnManagedCached(T_OVR, "abstract_co.png"); 					//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_SYNCH= createUnManagedCached(T_OVR, "synch_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_VOLATILE= createUnManagedCached(T_OVR, "volatile_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_TRANSIENT= createUnManagedCached(T_OVR, "transient_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_NATIVE= createUnManagedCached(T_OVR, "native_co.png"); 						//$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_OVR_RUN= createUnManagedCached(T_OVR, "run_co.gif"); 							//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_WARNING= createUnManagedCached(T_OVR, "warning_co.gif"); 					//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_IGNORE_OPTIONAL_PROBLEMS= createUnManagedCached(T_OVR, "ignore_optional_problems_ovr.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_ERROR= createUnManagedCached(T_OVR, "error_co.gif"); 						//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_BUILDPATH_ERROR= createUnManagedCached(T_OVR, "error_co_buildpath.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_OVERRIDES= createUnManagedCached(T_OVR, "over_co.gif");  					//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_IMPLEMENTS= createUnManagedCached(T_OVR, "implm_co.gif");  				//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_SYNCH_AND_OVERRIDES= createUnManagedCached(T_OVR, "sync_over.gif");  	//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_SYNCH_AND_IMPLEMENTS= createUnManagedCached(T_OVR, "sync_impl.gif");   //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_CONSTRUCTOR= createUnManagedCached(T_OVR, "constr_ovr.gif");			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_DEPRECATED= createUnManagedCached(T_OVR, "deprecated.gif");			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_DEFAULT= createUnManagedCached(T_OVR, "default_tsk.gif");			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_FOCUS= createUnManagedCached(T_OVR, "focus_ovr.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_ANNOTATION= createUnManagedCached(T_OVR, "annotation_tsk.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_ENUM= createUnManagedCached(T_OVR, "enum_tsk.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_INTERFACE= createUnManagedCached(T_OVR, "interface_tsk.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_CLASS= createUnManagedCached(T_OVR, "class_tsk.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_ABSTRACT_CLASS= createUnManagedCached(T_OVR, "class_abs_tsk.gif"); //$NON-NLS-1$
-	public static final ImageDescriptor DESC_OVR_LIBRARY= createUnManagedCached(T_OVR, "library_ovr.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_RUN= createUnManagedCached(T_OVR, "run_co.png"); 							//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_WARNING= createUnManagedCached(T_OVR, "warning_co.png"); 					//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_IGNORE_OPTIONAL_PROBLEMS= createUnManagedCached(T_OVR, "ignore_optional_problems_ovr.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ERROR= createUnManagedCached(T_OVR, "error_co.png"); 						//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_BUILDPATH_ERROR= createUnManagedCached(T_OVR, "error_co_buildpath.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_OVERRIDES= createUnManagedCached(T_OVR, "over_co.png");  					//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_IMPLEMENTS= createUnManagedCached(T_OVR, "implm_co.png");  				//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_SYNCH_AND_OVERRIDES= createUnManagedCached(T_OVR, "sync_over.png");  	//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_SYNCH_AND_IMPLEMENTS= createUnManagedCached(T_OVR, "sync_impl.png");   //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_CONSTRUCTOR= createUnManagedCached(T_OVR, "constr_ovr.png");			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_DEPRECATED= createUnManagedCached(T_OVR, "deprecated.png");			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_DEFAULT= createUnManagedCached(T_OVR, "default_tsk.png");			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_FOCUS= createUnManagedCached(T_OVR, "focus_ovr.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ANNOTATION= createUnManagedCached(T_OVR, "annotation_tsk.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ENUM= createUnManagedCached(T_OVR, "enum_tsk.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_INTERFACE= createUnManagedCached(T_OVR, "interface_tsk.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_CLASS= createUnManagedCached(T_OVR, "class_tsk.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_ABSTRACT_CLASS= createUnManagedCached(T_OVR, "class_abs_tsk.png"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_OVR_LIBRARY= createUnManagedCached(T_OVR, "library_ovr.png"); //$NON-NLS-1$
 
     // Call Hierarchy
-    public static final ImageDescriptor DESC_OVR_RECURSIVE= createUnManaged(T_OVR, "recursive_co.gif");              //$NON-NLS-1$
-    public static final ImageDescriptor DESC_OVR_MAX_LEVEL= createUnManaged(T_OVR, "maxlevel_co.gif");                    //$NON-NLS-1$
+    public static final ImageDescriptor DESC_OVR_RECURSIVE= createUnManaged(T_OVR, "recursive_co.png");              //$NON-NLS-1$
+    public static final ImageDescriptor DESC_OVR_MAX_LEVEL= createUnManaged(T_OVR, "maxlevel_co.png");                    //$NON-NLS-1$
 
 	public static final ImageDescriptor DESC_WIZBAN_NEWCLASS= createUnManaged(T_WIZBAN, "newclass_wiz.png"); 			//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_NEWINT= createUnManaged(T_WIZBAN, "newint_wiz.png"); 				//$NON-NLS-1$
@@ -410,7 +411,6 @@ public class JavaPluginImages {
 	public static final ImageDescriptor DESC_WIZBAN_NEWANNOT= createUnManaged(T_WIZBAN, "newannotation_wiz.png"); 				//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_NEWJPRJ= createUnManaged(T_WIZBAN, "newjprj_wiz.png"); 			//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_NEWSRCFOLDR= createUnManaged(T_WIZBAN, "newsrcfldr_wiz.png"); 	//$NON-NLS-1$
-	public static final ImageDescriptor DESC_WIZBAN_NEWMETH= createUnManaged(T_WIZBAN, "newmeth_wiz.png"); 			//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_NEWPACK= createUnManaged(T_WIZBAN, "newpack_wiz.png"); 			//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_NEWSCRAPPAGE= createUnManaged(T_WIZBAN, "newsbook_wiz.png");		//$NON-NLS-1$
 	public static final ImageDescriptor DESC_WIZBAN_JAVA_LAUNCH= createUnManaged(T_WIZBAN, "java_app_wiz.png"); 		//$NON-NLS-1$
@@ -435,20 +435,18 @@ public class JavaPluginImages {
 	public static final ImageDescriptor DESC_WIZBAN_CLEAN_UP= createUnManaged(T_WIZBAN, "cleanup_wiz.png"); //$NON-NLS-1$
 
 
-	public static final ImageDescriptor DESC_TOOL_SHOW_EMPTY_PKG= createUnManaged(T_ETOOL, "show_empty_pkg.gif"); 		//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_SHOW_SEGMENTS= createUnManaged(T_ETOOL, "segment_edit.gif"); 		//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_SHOW_SEGMENTS= createUnManaged(T_ETOOL, "segment_edit.png"); 		//$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_TOOL_OPENTYPE= createUnManaged(T_ETOOL, "opentype.gif"); 					//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_NEWPROJECT= createUnManaged(T_ETOOL, "newjprj_wiz.gif"); 			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_NEWPACKAGE= createUnManaged(T_ETOOL, "newpack_wiz.gif"); 			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_NEWCLASS= createUnManaged(T_ETOOL, "newclass_wiz.gif"); 				//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_NEWINTERFACE= createUnManaged(T_ETOOL, "newint_wiz.gif"); 			//$NON-NLS-1$
-	public static final ImageDescriptor DESC_TOOL_NEWSNIPPET= createUnManaged(T_ETOOL, "newsbook_wiz.gif"); 			//$NON-NLS-1$
-    public static final ImageDescriptor DESC_TOOL_NEWPACKROOT= createUnManaged(T_ETOOL, "newpackfolder_wiz.gif");         //$NON-NLS-1$
-    public static final ImageDescriptor DESC_DLCL_NEWPACKROOT= createUnManaged(T_DLCL, "newpackfolder_wiz.gif");        //$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_OPENTYPE= createUnManaged(T_ETOOL, "opentype.png"); 					//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_NEWPROJECT= createUnManaged(T_ETOOL, "newjprj_wiz.png"); 			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_NEWPACKAGE= createUnManaged(T_ETOOL, "newpack_wiz.png"); 			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_NEWCLASS= createUnManaged(T_ETOOL, "newclass_wiz.png"); 				//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_NEWINTERFACE= createUnManaged(T_ETOOL, "newint_wiz.png"); 			//$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_NEWSNIPPET= createUnManaged(T_ETOOL, "newsbook_wiz.png"); 			//$NON-NLS-1$
+    public static final ImageDescriptor DESC_TOOL_NEWPACKROOT= createUnManaged(T_ETOOL, "newpackfolder_wiz.png");         //$NON-NLS-1$
 
-	public static final ImageDescriptor DESC_TOOL_CLASSPATH_ORDER= createUnManaged(T_OBJ, "cp_order_obj.gif"); 		//$NON-NLS-1$
-	public static final ImageDescriptor DESC_ELCL_COLLAPSEALL= createUnManaged(T_ELCL, "collapseall.gif"); //$NON-NLS-1$
+	public static final ImageDescriptor DESC_TOOL_CLASSPATH_ORDER= createUnManaged(T_OBJ, "cp_order_obj.png"); 		//$NON-NLS-1$
+	public static final ImageDescriptor DESC_ELCL_COLLAPSEALL= createUnManaged(T_ELCL, "collapseall.png"); //$NON-NLS-1$
 
 	// Keys for correction proposal. We have to put the image into the registry since "code assist" doesn't
 	// have a life cycle. So no chance to dispose icons.
@@ -629,8 +627,30 @@ public class JavaPluginImages {
 	 * Added for 3.1.1.
 	 */
 	public static ImageDescriptor createImageDescriptor(Bundle bundle, IPath path, boolean useMissingImageDescriptor) {
-		URL url= FileLocator.find(bundle, path, null);
-		if (url != null) {
+		// Bug 465521: Can't use *.png in all existing keys, since some of them are made API via org.eclipse.jdt.ui.ISharedImages.
+		// Workaround is to keep keep keys as *.gif and convert them dynamically here (only for jdt.ui, but not for jdt.junit!).
+		if (bundle.equals(JavaPlugin.getDefault().getBundle()) && "gif".equals(path.getFileExtension())) { //$NON-NLS-1$
+			path= path.removeFileExtension().addFileExtension("png"); //$NON-NLS-1$
+		}
+		// Don't resolve the URL here, but create a URL using the
+		// "platform:/plugin" protocol, which also supports fragments,
+		// and for which URLImageDescriptor can find an "@2x" version.
+		// Caveat: The resulting URL may contain $nl$ etc., which is not
+		// directly supported by PlatformURLConnection and needs to go through
+		// FileLocator#find(URL), see bug 250432.
+		IPath uriPath= new Path("/plugin").append(bundle.getSymbolicName()).append(path); //$NON-NLS-1$
+		URL url= null;
+		try {
+			URI uri= new URI("platform", null, uriPath.toString(), null); //$NON-NLS-1$
+			url= uri.toURL();
+		} catch (MalformedURLException e) {
+			// no image
+		} catch (URISyntaxException e) {
+			// no image
+		}
+		
+		URL foundUrl= FileLocator.find(url);
+		if (foundUrl != null) {
 			return ImageDescriptor.createFromURL(url);
 		}
 		if (useMissingImageDescriptor) {

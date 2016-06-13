@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -63,6 +63,7 @@ import org.eclipse.ui.texteditor.TextEditorAction;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.ITypeRoot;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.Signature;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.CompilationUnit;
@@ -314,7 +315,7 @@ public final class ClipboardOperationAction extends TextEditorAction {
 				ITextEditorExtension3 extension= (ITextEditorExtension3)part;
 				return extension.getInsertMode() == ITextEditorExtension3.SMART_INSERT;
 			} else if (part != null && EditorUtility.isCompareEditorInput(part.getEditorInput())) {
-				ITextEditorExtension3 extension= (ITextEditorExtension3)part.getAdapter(ITextEditorExtension3.class);
+				ITextEditorExtension3 extension= part.getAdapter(ITextEditorExtension3.class);
 				if (extension != null)
 					return extension.getInsertMode() == ITextEditorExtension3.SMART_INSERT;
 			}
@@ -348,7 +349,7 @@ public final class ClipboardOperationAction extends TextEditorAction {
 
 		ITextEditor editor= getTextEditor();
 		if (fOperationTarget == null && editor!= null && fOperationCode != -1)
-			fOperationTarget= (ITextOperationTarget) editor.getAdapter(ITextOperationTarget.class);
+			fOperationTarget= editor.getAdapter(ITextOperationTarget.class);
 
 		boolean isEnabled= (fOperationTarget != null && fOperationTarget.canDoOperation(fOperationCode));
 		setEnabled(isEnabled);
@@ -526,7 +527,7 @@ public final class ClipboardOperationAction extends TextEditorAction {
 			ClipboardData importsData= (ClipboardData)clipboard.getContents(fgTransferInstance);
 			if (importsData != null && inputElement instanceof ICompilationUnit && !importsData.isFromSame(inputElement)) {
 				// combine operation and adding of imports
-				IRewriteTarget target= (IRewriteTarget)editor.getAdapter(IRewriteTarget.class);
+				IRewriteTarget target= editor.getAdapter(IRewriteTarget.class);
 				if (target != null) {
 					target.beginCompoundChange();
 				}
@@ -552,7 +553,10 @@ public final class ClipboardOperationAction extends TextEditorAction {
 		final ImportRewrite rewrite= StubUtility.createImportRewrite(unit, true);
 		String[] imports= data.getTypeImports();
 		for (int i= 0; i < imports.length; i++) {
-			rewrite.addImport(imports[i]);
+			String type= imports[i];
+			if (type.indexOf('.') != -1 || JavaModelUtil.isVersionLessThan(unit.getJavaProject().getOption(JavaCore.COMPILER_COMPLIANCE, true), JavaCore.VERSION_1_4)) {
+				rewrite.addImport(type);
+			}
 		}
 		String[] staticImports= data.getStaticImports();
 		for (int i= 0; i < staticImports.length; i++) {
@@ -590,7 +594,7 @@ public final class ClipboardOperationAction extends TextEditorAction {
 		if (editor != null) {
 			IWorkbenchPartSite site= editor.getSite();
 			if (site != null)
-				return (IWorkbenchSiteProgressService) editor.getSite().getAdapter(IWorkbenchSiteProgressService.class);
+				return editor.getSite().getAdapter(IWorkbenchSiteProgressService.class);
 		}
 		return PlatformUI.getWorkbench().getProgressService();
 	}

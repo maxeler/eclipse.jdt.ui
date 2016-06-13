@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,6 +11,7 @@
  *       bug "inline method - doesn't handle implicit cast" (see
  *       https://bugs.eclipse.org/bugs/show_bug.cgi?id=24941).
  *     Rabea Gransberger <rgransberger@gmx.de> - [quick fix] Fix several visibility issues - https://bugs.eclipse.org/394692
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.corext.dom;
 
@@ -42,6 +43,7 @@ import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.EnumDeclaration;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.IAnnotationBinding;
 import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.IPackageBinding;
@@ -299,8 +301,8 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the field specified by <code>fieldName<code> in
-	 * the given <code>type</code>. Returns <code>null</code> if no such field exits.
+	 * Finds the field specified by <code>fieldName</code> in
+	 * the given <code>type</code>. Returns <code>null</code> if no such field exists.
 	 * @param type the type to search the field in
 	 * @param fieldName the field name
 	 * @return the binding representing the field or <code>null</code>
@@ -346,8 +348,8 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the method specified by <code>methodName<code> and </code>parameters</code> in
-	 * the given <code>type</code>. Returns <code>null</code> if no such method exits.
+	 * Finds the method specified by <code>methodName</code> and <code>parameters</code> in
+	 * the given <code>type</code>. Returns <code>null</code> if no such method exists.
 	 * @param type The type to search the method in
 	 * @param methodName The name of the method to find
 	 * @param parameters The parameter types of the method to find. If <code>null</code> is passed, only
@@ -371,7 +373,7 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the method specified by <code>methodName</code> and </code>parameters</code> in
+	 * Finds the method specified by <code>methodName</code> and <code>parameters</code> in
 	 * the type hierarchy denoted by the given type. Returns <code>null</code> if no such method
 	 * exists. If the method is defined in more than one super type only the first match is
 	 * returned. First the super class is examined and then the implemented interfaces.
@@ -401,8 +403,8 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the method specified by <code>methodName<code> and </code>parameters</code> in
-	 * the given <code>type</code>. Returns <code>null</code> if no such method exits.
+	 * Finds the method specified by <code>methodName</code> and <code>parameters</code> in
+	 * the given <code>type</code>. Returns <code>null</code> if no such method exists.
 	 * @param type The type to search the method in
 	 * @param methodName The name of the method to find
 	 * @param parameters The parameter types of the method to find. If <code>null</code> is passed, only the name is matched and parameters are ignored.
@@ -425,7 +427,37 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the method specified by <code>methodName</code> and </code>parameters</code> in
+	 * Finds the method specified by <code>methodName</code> and <code>parameters</code> in
+	 * the given <code>type</code>. Returns <code>null</code> if no such method exists.
+	 * <p>
+	 * This variant of {@link #findMethodInType(ITypeBinding, String, String[])} looks for a method
+	 * whose {@link IMethodBinding#getMethodDeclaration() declaration}'s parameters matches the
+	 * given parameters.
+	 * </p>
+	 * 
+	 * @param type The type to search the method in
+	 * @param methodName The name of the method to find
+	 * @param parameters The parameter types of the method to find. If <code>null</code> is passed, only the name is matched and parameters are ignored.
+	 * @return the method binding representing the method
+	 */
+	public static IMethodBinding findMethodWithDeclaredParameterTypesInType(ITypeBinding type, String methodName, String[] parameters) {
+		if (type.isPrimitive())
+			return null;
+		IMethodBinding[] methods= type.getDeclaredMethods();
+		for (int i= 0; i < methods.length; i++) {
+			if (parameters == null) {
+				if (methodName.equals(methods[i].getName()))
+					return methods[i];
+			} else {
+				if (isEqualMethod(methods[i].getMethodDeclaration(), methodName, parameters))
+					return methods[i];
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Finds the method specified by <code>methodName</code> and <code>parameters</code> in
 	 * the type hierarchy denoted by the given type. Returns <code>null</code> if no such method
 	 * exists. If the method is defined in more than one super type only the first match is
 	 * returned. First the super class is examined and then the implemented interfaces.
@@ -454,11 +486,11 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds the method in the given <code>type</code> that is overridden by the specified <code>method<code>.
-	 * Returns <code>null</code> if no such method exits.
+	 * Finds the method in the given <code>type</code> that is overridden by the specified <code>method</code>.
+	 * Returns <code>null</code> if no such method exists.
 	 * @param type The type to search the method in
 	 * @param method The specified method that would override the result
-	 * @return the method binding of the method that is overridden by the specified <code>method<code>, or <code>null</code>
+	 * @return the method binding of the method that is overridden by the specified <code>method</code>, or <code>null</code>
 	 */
 	public static IMethodBinding findOverriddenMethodInType(ITypeBinding type, IMethodBinding method) {
 		IMethodBinding[] methods= type.getDeclaredMethods();
@@ -470,7 +502,7 @@ public class Bindings {
 	}
 
 	/**
-	 * Finds a method in the hierarchy of <code>type</code> that is overridden by </code>binding</code>.
+	 * Finds a method in the hierarchy of <code>type</code> that is overridden by <code>binding</code>.
 	 * Returns <code>null</code> if no such method exists. If the method is defined in more than one super type only the first match is
 	 * returned. First the super class is examined and then the implemented interfaces.
 	 * @param type The type to search the method in
@@ -879,6 +911,34 @@ public class Bindings {
 		return null;
 	}
 
+	/**
+	 * Searches for a type binding for a given fully qualified type in the hierarchy of a type.
+	 * Returns the immediate super type in whose supertype hierarchy the given type appears, or <code>null</code> if no type binding is found.
+	 * @param hierarchyType the binding representing the hierarchy
+	 * @param fullyQualifiedTypeName the fully qualified name to search for
+	 * @return the type binding
+	 */
+	public static ITypeBinding findImmediateSuperTypeInHierarchy(ITypeBinding hierarchyType, String fullyQualifiedTypeName) {
+		if (hierarchyType.isArray() || hierarchyType.isPrimitive()) {
+			return null;
+		}
+		ITypeBinding superClass= hierarchyType.getSuperclass();
+		if (superClass != null) {
+			ITypeBinding res= findTypeInHierarchy(superClass, fullyQualifiedTypeName);
+			if (res != null) {
+				return superClass;
+			}
+		}
+		ITypeBinding[] superInterfaces= hierarchyType.getInterfaces();
+		for (int i= 0; i < superInterfaces.length; i++) {
+			ITypeBinding res= findTypeInHierarchy(superInterfaces[i], fullyQualifiedTypeName);
+			if (res != null) {
+				return superInterfaces[i];
+			}
+		}
+		return null;
+	}
+	
 	/**
 	 * Returns the binding of the variable written in an Assignment.
 	 * @param assignment The assignment
@@ -1489,10 +1549,68 @@ public class Bindings {
 		}
 	}
 
-	public static boolean isNullAnnotation(ITypeBinding annotationType, IJavaProject project) {
+	public static boolean isNonNullAnnotation(ITypeBinding annotationType, IJavaProject project) {
+		String qualifiedName= annotationType.getQualifiedName();
+		return qualifiedName.equals(project.getOption(JavaCore.COMPILER_NONNULL_ANNOTATION_NAME, true));
+	}
+
+	public static boolean isAnyNullAnnotation(ITypeBinding annotationType, IJavaProject project) {
 		String qualifiedName= annotationType.getQualifiedName();
 		return qualifiedName.equals(project.getOption(JavaCore.COMPILER_NONNULL_ANNOTATION_NAME, true))
 				|| qualifiedName.equals(project.getOption(JavaCore.COMPILER_NULLABLE_ANNOTATION_NAME, true));
+	}
+
+	/**
+	 * Answer the annotation binding representing a nullness default
+	 * effective at the point denoted by 'contextBinding'.
+	 * @param contextBinding method binding or type binding denoting the location of interest
+	 * @param javaProject the containing java project, consulted for the actual name of
+	 *  the annotation used for nullness defaults (default: <code>@NonNullByDefault</code>).
+	 * @return binding for the effective nullness default annotation
+	 * 	or null if no nullness default is effective at the context location.
+	 */
+	public static IAnnotationBinding findNullnessDefault(IBinding contextBinding, IJavaProject javaProject) {
+		if (JavaCore.ENABLED.equals(javaProject.getOption(JavaCore.COMPILER_ANNOTATION_NULL_ANALYSIS, true))) {
+			String annotationName= javaProject.getOption(JavaCore.COMPILER_NONNULL_BY_DEFAULT_ANNOTATION_NAME, true);
+			while (contextBinding != null) {
+				for (IAnnotationBinding annotation : contextBinding.getAnnotations()) {
+					ITypeBinding annotationType= annotation.getAnnotationType();
+					if (annotationType != null && annotationType.getQualifiedName().equals(annotationName))
+						return annotation;
+				}
+				// travel out:
+				switch (contextBinding.getKind()) {
+					case IBinding.METHOD:
+						IMethodBinding methodBinding= (IMethodBinding) contextBinding;
+						contextBinding= methodBinding.getDeclaringMember();
+						if (contextBinding == null)
+							contextBinding= methodBinding.getDeclaringClass();
+						break;
+					case IBinding.VARIABLE:
+						IVariableBinding variableBinding= (IVariableBinding) contextBinding;
+						contextBinding= variableBinding.getDeclaringMethod();
+						if (contextBinding == null)
+							contextBinding= variableBinding.getDeclaringClass();
+						break;
+					case IBinding.TYPE:
+						ITypeBinding currentClass= (ITypeBinding) contextBinding;
+						contextBinding= currentClass.getDeclaringMember();
+						if (contextBinding == null) {
+							contextBinding= currentClass.getDeclaringMethod();
+							if (contextBinding == null) {
+								contextBinding= currentClass.getDeclaringClass();
+								if (contextBinding == null)
+									contextBinding= currentClass.getPackage();
+							}
+						}
+						break;
+					default:
+						contextBinding= null;
+						break;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**

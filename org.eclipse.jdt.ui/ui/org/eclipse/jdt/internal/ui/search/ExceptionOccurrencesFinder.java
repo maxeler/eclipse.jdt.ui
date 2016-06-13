@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -26,6 +26,7 @@ import org.eclipse.jdt.core.dom.ConstructorInvocation;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.Javadoc;
+import org.eclipse.jdt.core.dom.LambdaExpression;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Name;
@@ -79,19 +80,17 @@ public class ExceptionOccurrencesFinder extends ASTVisitor implements IOccurrenc
 		if (node == null)
 			return SearchMessages.ExceptionOccurrencesFinder_no_exception;
 		
-		MethodDeclaration method= ASTResolving.findParentMethodDeclaration(node);
-		if (method == null)
-			return SearchMessages.ExceptionOccurrencesFinder_no_exception;
-		
 		// The ExceptionOccurrencesFinder selects the whole type, no matter what part of it was selected. MethodExitsFinder behaves similar.
 		
 		if (node instanceof Name) {
 			node= ASTNodes.getTopMostName((Name) node);
 		}
-		ASTNode parent= node.getParent();
 		if (node.getLocationInParent() == TagElement.FRAGMENTS_PROPERTY) {
+			MethodDeclaration method= ASTResolving.findParentMethodDeclaration(node);
+			if (method == null)
+				return SearchMessages.ExceptionOccurrencesFinder_no_exception;
 			// in Javadoc tag:
-			TagElement tagElement= (TagElement) parent;
+			TagElement tagElement= (TagElement) node.getParent();
 			String tagName= tagElement.getTagName();
 			if (node instanceof Name
 					&& node == tagElement.fragments().get(0)
@@ -109,6 +108,9 @@ public class ExceptionOccurrencesFinder extends ASTVisitor implements IOccurrenc
 			
 			// in method's "throws" list:
 			if (type.getLocationInParent() == MethodDeclaration.THROWN_EXCEPTION_TYPES_PROPERTY) {
+				MethodDeclaration method= ASTResolving.findParentMethodDeclaration(node);
+				if (method == null)
+					return SearchMessages.ExceptionOccurrencesFinder_no_exception;
 				fSelectedNode= type;
 				fException= type.resolveBinding();
 				fStart= method;
@@ -244,6 +246,11 @@ public class ExceptionOccurrencesFinder extends ASTVisitor implements IOccurrenc
 			fResult.add(new OccurrenceLocation(node.getStartPosition(), 4, 0, fDescription));
 		}
 		return super.visit(node);
+	}
+
+	@Override
+	public boolean visit(LambdaExpression node) {
+		return false;
 	}
 
 	@Override

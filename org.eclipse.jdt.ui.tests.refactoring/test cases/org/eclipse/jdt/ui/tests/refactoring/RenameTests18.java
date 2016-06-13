@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.jdt.ui.tests.refactoring;
 
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -17,7 +18,14 @@ import java.util.List;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import org.eclipse.jdt.testplugin.JavaProjectHelper;
+
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.NullProgressMonitor;
+
+import org.eclipse.core.filebuffers.ITextFileBuffer;
+import org.eclipse.core.filebuffers.ITextFileBufferManager;
+import org.eclipse.core.filebuffers.LocationKind;
 
 import org.eclipse.ltk.core.refactoring.RefactoringCore;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -52,7 +60,18 @@ public class RenameTests18 extends RefactoringTest {
 	}
 
 	public static Test setUpTest(Test someTest) {
-		return new Java18Setup(someTest);
+		return new Java18Setup(someTest) {
+			@Override
+			protected void setUp() throws Exception {
+				JavaProjectHelper.PERFORM_DUMMY_SEARCH++;
+				super.setUp();
+			}
+			@Override
+			protected void tearDown() throws Exception {
+				super.tearDown();
+				JavaProjectHelper.PERFORM_DUMMY_SEARCH--;
+			}
+		};
 	}
 
 	protected String getRefactoringPath() {
@@ -100,8 +119,61 @@ public class RenameTests18 extends RefactoringTest {
 		args.add(new RenameArguments(newFieldName, updateReferences));
 		String[] renameHandles= ParticipantTesting.createHandles(list.toArray());
 
-		RefactoringStatus result= performRefactoring(refactoring);
-		assertEquals("was supposed to pass", null, result);
+		try {
+//			org.eclipse.jdt.internal.core.JavaModelManager.VERBOSE= true;
+			RefactoringStatus result= performRefactoring(refactoring);
+			assertEquals("was supposed to pass", null, result);
+		} catch (CoreException e) {
+			System.out.println("RenameTest18." + getName() + ": " + e.toString());
+			System.out.println(cu.getResource().getLocationURI());
+			System.out.println(cu.getResource().getModificationStamp());
+			System.out.println(cu.getResource().getLocalTimeStamp());
+			System.out.println(cu.getResource().isSynchronized(0));
+			ITextFileBuffer fileBuffer= ITextFileBufferManager.DEFAULT.getTextFileBuffer(cu.getResource().getFullPath(), LocationKind.IFILE);
+			if (fileBuffer != null) {
+				System.out.println(fileBuffer.getModificationStamp());
+				System.out.println("isCommittable:" + fileBuffer.isCommitable()
+						+ "\nisDirty:" + fileBuffer.isDirty()
+						+ "\nisShared:" + fileBuffer.isShared()
+						+ "\nisStateValidated:" + fileBuffer.isStateValidated()
+						+ "\nisSynchronizationContextRequested:" + fileBuffer.isSynchronizationContextRequested()
+						+ "\nisSynchronized:" + fileBuffer.isSynchronized()
+						);
+				System.out.println(fileBuffer.getStatus());
+				System.out.println("--- fileBuffer.getDocument().get():");
+				System.out.println(fileBuffer.getDocument().get());
+			}
+			System.out.println("--- getContents of File:");
+			System.out.println(getContents(new FileInputStream(cu.getResource().getLocation().toFile())));
+			System.out.println("--- cu.getSource():");
+			System.out.println(cu.getSource());
+			System.out.println("---");
+			System.out.println("cu.getOwner(): " + cu.getOwner());
+			System.out.println("cu.isWorkingCopy(): " + cu.isWorkingCopy());
+			System.out.println("cu.isConsistent(): " + cu.isConsistent());
+			System.out.println("cu.getBuffer().getClass(): " + cu.getBuffer().getClass());
+			System.out.println("cu.getBuffer().hasUnsavedChanges(): " + cu.getBuffer().hasUnsavedChanges());
+			System.out.println(cu.getBuffer());
+			/*
+			 * Problems:
+			 * fileBuffer still has contents from previous test, and
+			 * textEdits from current test are applied on that buffer.
+			 * But the cu.getBuffer() has this test's content!
+			 * cu.getBuffer() is a jdt.internal.core.Buffer and not a DocumentAdapter.
+			 * The cu is NOT in working copy mode.
+			 * Somehow, the BecomeWorkingCopyOperation failed.
+			 * 
+			 * Observation: The A.java files contain secondary types. Maybe a threading problem
+			 * with the indexer?
+			 * 
+			 * A failing test execution order of RenameTests18 with jdk7:
+			 * - green: testMethodReference0
+			 * - fails: testLambda0
+			 */
+			throw e;
+		} finally {
+//			org.eclipse.jdt.internal.core.JavaModelManager.VERBOSE= false;
+		}
 		assertEqualLines("invalid renaming", getFileContents(getOutputTestFileName("A")), cu.getSource());
 
 		ParticipantTesting.testRename(
@@ -150,7 +222,19 @@ public class RenameTests18 extends RefactoringTest {
 		descriptor.setKeepOriginal(createDelegate);
 		descriptor.setDeprecateDelegate(true);
 
-		assertEquals("was supposed to pass", null, performRefactoring(descriptor));
+		try {
+			assertEquals("was supposed to pass", null, performRefactoring(descriptor));
+		} catch (CoreException e) {
+			System.out.println("RenameTest18." + getName() + ": " + e.toString());
+			System.out.println(cu.getResource().getLocationURI());
+			System.out.println(cu.getResource().getModificationStamp());
+			System.out.println(cu.getResource().getLocalTimeStamp());
+			System.out.println(cu.getResource().isSynchronized(0));
+			System.out.println("---");
+			System.out.println(cu.getSource());
+			System.out.println("---");
+			throw e;
+		}
 		if (!shouldPass){
 			assertTrue("incorrect renaming because of a java model bug", ! getFileContents(getOutputTestFileName("A")).equals(cu.getSource()));
 			return;

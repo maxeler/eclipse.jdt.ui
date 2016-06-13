@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,8 @@
  *     Renaud Waldura &lt;renaud+eclipse@waldura.com&gt; - Access to static proposal
  *     Benjamin Muskalla <bmuskalla@innoopract.com> - [quick fix] Shouldn't offer "Add throws declaration" quickfix for overriding signature if result would conflict with overridden signature
  *     Lukas Hanke <hanke@yatta.de> - Bug 241696 [quick fix] quickfix to iterate over a collection - https://bugs.eclipse.org/bugs/show_bug.cgi?id=241696
+ *     Sandra Lions <sandra.lions-piron@oracle.com> - [quick fix] for qualified enum constants in switch-case labels - https://bugs.eclipse.org/bugs/90140
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.correction;
 
@@ -766,6 +768,28 @@ public class LocalCorrectionsSubProcessor {
 
 	}
 
+	public static void addIllegalQualifiedEnumConstantLabelProposal(IInvocationContext context, IProblemLocation problem, Collection<ICommandAccess> proposals) {
+		ASTNode coveringNode= problem.getCoveringNode(context.getASTRoot());
+
+		ASTNode curr= coveringNode;
+		while (curr instanceof ParenthesizedExpression) {
+			curr= ((ParenthesizedExpression) curr).getExpression();
+		}
+
+		if (!(curr instanceof QualifiedName)) {
+			return;
+		}
+
+		SimpleName simpleName= ((QualifiedName) curr).getName();
+		final ASTRewrite rewrite= ASTRewrite.create(curr.getAST());
+		rewrite.replace(coveringNode, simpleName, null);
+
+		String label= Messages.format(CorrectionMessages.LocalCorrectionsSubProcessor_replace_with_unqualified_enum_constant, BasicElementLabels.getJavaElementName(simpleName.getIdentifier()));
+		Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, IProposalRelevance.REPLACE_WITH_UNQUALIFIED_ENUM_CONSTANT, image);
+		proposals.add(proposal);
+	}
+
 	public static void addUnnecessaryThrownExceptionProposal(IInvocationContext context, IProblemLocation problem, Collection<ICommandAccess> proposals) {
 		ASTNode selectedNode= problem.getCoveringNode(context.getASTRoot());
 		selectedNode= ASTNodes.getNormalizedNode(selectedNode);
@@ -1094,16 +1118,29 @@ public class LocalCorrectionsSubProcessor {
 			// also offer split && / || condition proposals:
 			InfixExpression infixExpression= (InfixExpression)parent;
 			Expression leftOperand= infixExpression.getLeftOperand();
-			List<Expression> extendedOperands= infixExpression.extendedOperands();
 			
 			ASTRewrite rewrite= ASTRewrite.create(parent.getAST());
-			if (extendedOperands.size() == 0) {
-				rewrite.replace(infixExpression, rewrite.createMoveTarget(leftOperand), null);
-			} else {
-				ASTNode firstExtendedOp= rewrite.createMoveTarget(extendedOperands.get(0));
-				rewrite.set(infixExpression, InfixExpression.RIGHT_OPERAND_PROPERTY, firstExtendedOp, null);
-				rewrite.remove(leftOperand, null);
+			
+			Expression replacement= leftOperand;
+			while (replacement instanceof ParenthesizedExpression) {
+				replacement= ((ParenthesizedExpression) replacement).getExpression();
 			}
+			
+			Expression toReplace= infixExpression;
+			while (toReplace.getLocationInParent() == ParenthesizedExpression.EXPRESSION_PROPERTY) {
+				toReplace= (Expression) toReplace.getParent();
+			}
+			
+			if (NecessaryParenthesesChecker.needsParentheses(replacement, toReplace.getParent(), toReplace.getLocationInParent())) {
+				if (leftOperand instanceof ParenthesizedExpression) {
+					replacement= (Expression) replacement.getParent();
+				} else if (infixExpression.getLocationInParent() == ParenthesizedExpression.EXPRESSION_PROPERTY) {
+					toReplace= ((ParenthesizedExpression) toReplace).getExpression();
+				}
+			}
+			
+			rewrite.replace(toReplace, rewrite.createMoveTarget(replacement), null);
+
 			String label= CorrectionMessages.LocalCorrectionsSubProcessor_removeunreachablecode_description;
 			addRemoveProposal(context, rewrite, label, proposals);
 			
@@ -1836,12 +1873,11 @@ public class LocalCorrectionsSubProcessor {
 		LinkedCorrectionProposal proposal2= new LinkedCorrectionProposal(label, cu, rewrite, IProposalRelevance.OVERRIDE_HASHCODE, image);
 		ImportRewrite importRewrite= proposal2.createImportRewrite(astRoot);
 		
-		String typeQualifiedName= type.getTypeQualifiedName('.');
 		final CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(cu.getJavaProject());
 		
 		try {
 			ImportRewriteContext importContext= new ContextSensitiveImportRewriteContext(astRoot, problem.getOffset(), importRewrite);
-			MethodDeclaration hashCode= StubUtility2.createImplementationStub(cu, rewrite, importRewrite, importContext, superHashCode, typeQualifiedName, settings, false);
+			MethodDeclaration hashCode= StubUtility2.createImplementationStub(cu, rewrite, importRewrite, importContext, superHashCode, binding, settings, false, null);
 			BodyDeclarationRewrite.create(rewrite, typeDeclaration).insert(hashCode, null);
 			
 			proposal2.setEndPosition(rewrite.track(hashCode));
@@ -1861,4 +1897,137 @@ public class LocalCorrectionsSubProcessor {
 		}
 	}
 
+	public static void getConvertLambdaToAnonymousClassCreationsProposals(IInvocationContext context, IProblemLocation problem, Collection<ICommandAccess> proposals) {
+		ASTNode coveringNode= problem.getCoveringNode(context.getASTRoot());
+		if (coveringNode != null) {
+			QuickAssistProcessor.getConvertLambdaToAnonymousClassCreationsProposals(context, coveringNode, proposals);
+		}
+	}
+
+	public static void addOverrideDefaultMethodProposal(IInvocationContext context, IProblemLocation problem, Collection<ICommandAccess> proposals) {
+		CompilationUnit astRoot= context.getASTRoot();
+
+		ASTNode selectedNode= problem.getCoveringNode(astRoot);
+		if (selectedNode == null) {
+			return;
+		}
+
+		StructuralPropertyDescriptor locationInParent= selectedNode.getLocationInParent();
+		if (locationInParent != TypeDeclaration.NAME_PROPERTY && locationInParent != EnumDeclaration.NAME_PROPERTY) {
+			return;
+		}
+
+		ASTNode typeNode= selectedNode.getParent();
+		if (typeNode == null) {
+			return;
+		}
+
+		ITypeBinding typeBinding= ((AbstractTypeDeclaration) typeNode).resolveBinding();
+		if (typeBinding == null) {
+			return;
+		}
+
+		if (problem.getProblemId() == IProblem.DuplicateInheritedDefaultMethods) {
+			String[] args= problem.getProblemArguments();
+			if (args.length < 5) {
+				return;
+			}
+
+			String methodName= args[0];
+			if (methodName == null) {
+				return;
+			}
+
+			String[] parameters1= {};
+			if (args[1] != null && args[1].length() != 0) {
+				parameters1= args[1].split(", "); //$NON-NLS-1$
+			}
+			String[] parameters2= {};
+			if (args[2] != null && args[2].length() != 0) {
+				parameters2= args[2].split(", "); //$NON-NLS-1$
+			}
+
+			addOverrideProposal(typeNode, typeBinding, methodName, parameters1, args[3], context, proposals, true);
+			addOverrideProposal(typeNode, typeBinding, methodName, parameters2, args[4], context, proposals, true);
+
+		} else if (problem.getProblemId() == IProblem.InheritedDefaultMethodConflictsWithOtherInherited) {
+			String[] args= problem.getProblemArguments();
+			if (args.length < 3) {
+				return;
+			}
+
+			String arg0= args[0];
+			if (arg0 == null) {
+				return;
+			}
+			int indexOfLParen= arg0.indexOf('(');
+			if (indexOfLParen == -1) {
+				return;
+			}
+			int indexOfRParen= arg0.indexOf(')');
+			if (indexOfRParen == -1) {
+				return;
+			}
+
+			String methodName= arg0.substring(0, indexOfLParen);
+
+			String paramString= arg0.substring(indexOfLParen + 1, indexOfRParen);
+			String[] parameters= {};
+			if (paramString != null && paramString.length() != 0) {
+				parameters= paramString.split(", "); //$NON-NLS-1$
+			}
+
+			addOverrideProposal(typeNode, typeBinding, methodName, parameters, args[1], context, proposals, true);
+			addOverrideProposal(typeNode, typeBinding, methodName, parameters, args[2], context, proposals, false);
+
+		}
+	}
+
+	private static void addOverrideProposal(ASTNode typeNode, ITypeBinding typeBinding, String methodName, String[] parameters, String superType,
+			IInvocationContext context, Collection<ICommandAccess> proposals, boolean isDefaultMethod) {
+		ITypeBinding superTypeBinding= null;
+		if (superType != null) {
+			int i= superType.indexOf('<');
+			if (i > 0) {
+				superType= superType.substring(0, i);
+			}
+			superTypeBinding= Bindings.findTypeInHierarchy(typeBinding, superType);
+		}
+		if (superTypeBinding == null) {
+			return;
+		}
+
+		IMethodBinding methodToOverride= Bindings.findMethodWithDeclaredParameterTypesInType(superTypeBinding, methodName, parameters);
+		if (methodToOverride == null) {
+			return;
+		}
+
+		String label;
+		if (isDefaultMethod) {
+			label= Messages.format(CorrectionMessages.LocalCorrectionsSubProcessor_override_default_method_description, superTypeBinding.getName());
+		} else {
+			label= Messages.format(CorrectionMessages.LocalCorrectionsSubProcessor_override_method_description, superTypeBinding.getName());
+		}
+		Image image= JavaPluginImages.get(JavaPluginImages.IMG_MISC_PUBLIC);
+
+		CompilationUnit astRoot= context.getASTRoot();
+		ASTRewrite rewrite= ASTRewrite.create(astRoot.getAST());
+		ICompilationUnit cu= context.getCompilationUnit();
+		LinkedCorrectionProposal proposal= new LinkedCorrectionProposal(label, cu, rewrite, IProposalRelevance.OVERRIDE_DEFAULT_METHOD, image);
+
+		ImportRewrite importRewrite= proposal.createImportRewrite(astRoot);
+		ImportRewriteContext importRewriteContext= new ContextSensitiveImportRewriteContext(astRoot, typeNode.getStartPosition(), importRewrite);
+		CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(cu.getJavaProject());
+		try {
+			MethodDeclaration stub= StubUtility2.createImplementationStub(cu, rewrite, importRewrite, importRewriteContext, methodToOverride, typeBinding, settings,
+					typeBinding.isInterface(), typeBinding);
+			BodyDeclarationRewrite.create(rewrite, typeNode).insert(stub, null);
+
+			proposal.setEndPosition(rewrite.track(stub));
+		} catch (CoreException e) {
+			JavaPlugin.log(e);
+		}
+
+		proposals.add(proposal);
+	}
 }

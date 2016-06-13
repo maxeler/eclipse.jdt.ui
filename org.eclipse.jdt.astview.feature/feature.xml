@@ -2,12 +2,13 @@
 <feature
       id="org.eclipse.jdt.astview.feature"
       label="AST View"
-      version="1.1.9.qualifier"
-      provider-name="Eclipse.org">
-   <install-handler/>
+      version="1.1.10.qualifier"
+      provider-name="Eclipse.org"
+      license-feature="org.eclipse.license"
+      license-feature-version="0.0.0">
 
    <description>
-      AST View for JDT 4.4 and later
+      AST View for Eclipse 4.4 (Luna) and later (jdt.core 3.10)
    </description>
 
    <license url="%licenseURL">
@@ -19,8 +20,8 @@
    </url>
 
    <requires>
-      <import plugin="org.eclipse.jdt.core" version="3.9.0" match="compatible"/>
-      <import plugin="org.eclipse.jdt.ui" version="3.9.0" match="compatible"/>
+      <import plugin="org.eclipse.jdt.core" version="3.10.0" match="compatible"/>
+      <import plugin="org.eclipse.jdt.ui" version="3.10.0" match="compatible"/>
       <import plugin="org.eclipse.core.runtime"/>
       <import plugin="org.eclipse.ui.ide"/>
       <import plugin="org.eclipse.ui.views"/>

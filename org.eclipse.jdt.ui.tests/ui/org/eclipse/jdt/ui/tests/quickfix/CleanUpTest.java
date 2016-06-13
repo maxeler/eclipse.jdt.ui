@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2014 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -3583,7 +3583,8 @@ public class CleanUpTest extends CleanUpTestCase {
 		buf.append("public class E1 {\n");
 		buf.append("    public void test() {\n");
 		buf.append("        E1.bar().g().g();\n");
-		buf.append("        E1.foo(E1.foo(null).bar());\n");
+		buf.append("        E1.foo(null);\n");
+		buf.append("        E1.foo(E1.bar());\n");
 		buf.append("        E1 t = E1.bar();\n");
 		buf.append("    }\n");
 		buf.append("\n");
@@ -3651,6 +3652,58 @@ public class CleanUpTest extends CleanUpTestCase {
 		buf.append("}\n");
 		String expected1= buf.toString();
 
+		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+	}
+
+	public void testChangeNonstaticAccessToStatic_Bug439733() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("class Singleton {\n");
+		buf.append("    public static String name = \"The Singleton\";\n");
+		buf.append("    public static Singleton instance = new Singleton();\n");
+		buf.append("    public static Singleton getInstance() {\n");
+		buf.append("        return instance;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		buf.append("\n");
+		buf.append("public class E1 {\n");
+		buf.append("    public static void main(String[] args) {\n");
+		buf.append("        System.out.println(Singleton.instance.name);\n");
+		buf.append("        System.out.println(Singleton.getInstance().name);\n");
+		buf.append("        System.out.println(Singleton.getInstance().getInstance().name);\n");
+		buf.append("        System.out.println(new Singleton().name);\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		ICompilationUnit cu1= pack1.createCompilationUnit("E1.java", buf.toString(), false, null);
+	
+		enable(CleanUpConstants.MEMBER_ACCESSES_STATIC_QUALIFY_WITH_DECLARING_CLASS);
+		enable(CleanUpConstants.MEMBER_ACCESSES_STATIC_QUALIFY_WITH_DECLARING_CLASS_INSTANCE_ACCESS);
+	
+		buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("class Singleton {\n");
+		buf.append("    public static String name = \"The Singleton\";\n");
+		buf.append("    public static Singleton instance = new Singleton();\n");
+		buf.append("    public static Singleton getInstance() {\n");
+		buf.append("        return instance;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		buf.append("\n");
+		buf.append("public class E1 {\n");
+		buf.append("    public static void main(String[] args) {\n");
+		buf.append("        System.out.println(Singleton.name);\n");
+		buf.append("        Singleton.getInstance();\n");
+		buf.append("        System.out.println(Singleton.name);\n");
+		buf.append("        Singleton.getInstance();\n");
+		buf.append("        Singleton.getInstance();\n");
+		buf.append("        System.out.println(Singleton.name);\n");
+		buf.append("        new Singleton();\n");
+		buf.append("        System.out.println(Singleton.name);\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String expected1= buf.toString();
+	
 		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
 	}
 
@@ -8451,8 +8504,8 @@ public class CleanUpTest extends CleanUpTestCase {
 		buf= new StringBuffer();
 		buf.append("package test;\n");
 		buf.append("public class SM02 {\n");
-		buf.append("    public String s2;\n");
 		buf.append("    public static String s1;\n");
+		buf.append("    public String s2;\n");
 		buf.append("   void c() {};\n");
 		buf.append("   void d() {};\n");
 		buf.append("}\n");
@@ -8488,6 +8541,216 @@ public class CleanUpTest extends CleanUpTestCase {
 		String expected1= buf.toString();
 		
 		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+	}
+	
+	public void testSortMembersBug434941() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    public static final int CONSTANT = 5;\n");
+		buf.append("    public static void main(final String[] args) { }\n");
+		buf.append("}\n");
+		ICompilationUnit cu1= pack1.createCompilationUnit("A.java", buf.toString(), false, null);
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		enable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		assertRefactoringHasNoChange(new ICompilationUnit[] { cu1 });
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		disable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		assertRefactoringHasNoChange(new ICompilationUnit[] { cu1 });
+	}
+
+	public void testSortMembersMixedFields() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    public static final int B = 1;\n");
+		buf.append("    public final int A = 2;\n");
+		buf.append("    public static final int C = 3;\n");
+		buf.append("    public final int D = 4;\n");
+		buf.append("}\n");
+		ICompilationUnit cu1= pack1.createCompilationUnit("A.java", buf.toString(), false, null);
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		disable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    public static final int B = 1;\n");
+		buf.append("    public static final int C = 3;\n");
+		buf.append("    public final int A = 2;\n");
+		buf.append("    public final int D = 4;\n");
+		buf.append("}\n");
+		
+		String expected1= buf.toString();
+		
+		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+	}
+	
+	public void testSortMembersMixedFieldsInterface() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public interface A {\n");
+		buf.append("    public static final int B = 1;\n");
+		buf.append("    public final int A = 2;\n");
+		buf.append("    public static final int C = 3;\n");
+		buf.append("    public final int D = 4;\n");
+		buf.append("}\n");
+		ICompilationUnit cu1= pack1.createCompilationUnit("A.java", buf.toString(), false, null);
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		disable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		assertRefactoringHasNoChange(new ICompilationUnit[] { cu1 });
+		
+		enable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public interface A {\n");
+		buf.append("    public final int A = 2;\n");
+		buf.append("    public static final int B = 1;\n");
+		buf.append("    public static final int C = 3;\n");
+		buf.append("    public final int D = 4;\n");
+		buf.append("}\n");
+		
+		String expected1= buf.toString();
+		
+		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+	}
+	
+	public void testSortMembersBug407759() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    void foo2() {}\n");
+		buf.append("    void foo1() {}\n");
+		buf.append("    static int someInt;\n");
+		buf.append("    static void fooStatic() {}\n");
+		buf.append("    static {\n");
+		buf.append("    	someInt = 1;\n");
+		buf.append("    }\n");
+		buf.append("    void foo3() {}\n");
+		buf.append("    static int anotherInt = someInt;\n");
+		buf.append("    void foo() {}\n");
+		buf.append("}\n");
+		ICompilationUnit cu1= pack1.createCompilationUnit("A.java", buf.toString(), false, null);
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		disable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    static int someInt;\n");
+		buf.append("    static {\n");
+		buf.append("    	someInt = 1;\n");
+		buf.append("    }\n");
+		buf.append("    static int anotherInt = someInt;\n");
+		buf.append("    static void fooStatic() {}\n");
+		buf.append("    void foo() {}\n");
+		buf.append("    void foo1() {}\n");
+		buf.append("    void foo2() {}\n");
+		buf.append("    void foo3() {}\n");
+		buf.append("}\n");
+		
+		String expected1= buf.toString();
+		
+		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+		
+		enable(CleanUpConstants.SORT_MEMBERS);
+		enable(CleanUpConstants.SORT_MEMBERS_ALL);
+		
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class A {\n");
+		buf.append("    static int anotherInt = someInt;\n");
+		buf.append("    static int someInt;\n");
+		buf.append("    static {\n");
+		buf.append("    	someInt = 1;\n");
+		buf.append("    }\n");
+		buf.append("    static void fooStatic() {}\n");
+		buf.append("    void foo() {}\n");
+		buf.append("    void foo1() {}\n");
+		buf.append("    void foo2() {}\n");
+		buf.append("    void foo3() {}\n");
+		buf.append("}\n");
+		
+		expected1= buf.toString();
+		
+		assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+	}
+	
+	public void testSortMembersVisibility() throws Exception {
+		JavaPlugin.getDefault().getPreferenceStore().setValue(PreferenceConstants.APPEARANCE_ENABLE_VISIBILITY_SORT_ORDER, true);
+		JavaPlugin.getDefault().getPreferenceStore().setToDefault(PreferenceConstants.APPEARANCE_VISIBILITY_SORT_ORDER);
+		
+		try {
+			IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+			StringBuffer buf= new StringBuffer();
+			buf.append("package test;\n");
+			buf.append("public class A {\n");
+			buf.append("    public final int B = 1;\n");
+			buf.append("    private static final int AA = 1;\n");
+			buf.append("    public static final int BB = 2;\n");
+			buf.append("    private final int A = 2;\n");
+			buf.append("    final int C = 3;\n");
+			buf.append("    protected static final int DD = 3;\n");
+			buf.append("    final static int CC = 4;\n");
+			buf.append("    protected final int D = 4;\n");
+			buf.append("}\n");
+			ICompilationUnit cu1= pack1.createCompilationUnit("A.java", buf.toString(), false, null);
+			
+			enable(CleanUpConstants.SORT_MEMBERS);
+			disable(CleanUpConstants.SORT_MEMBERS_ALL);
+			
+			buf= new StringBuffer();
+			buf.append("package test;\n");
+			buf.append("public class A {\n");
+			buf.append("    private static final int AA = 1;\n");
+			buf.append("    public static final int BB = 2;\n");
+			buf.append("    protected static final int DD = 3;\n");
+			buf.append("    final static int CC = 4;\n");
+			buf.append("    public final int B = 1;\n");
+			buf.append("    private final int A = 2;\n");
+			buf.append("    final int C = 3;\n");
+			buf.append("    protected final int D = 4;\n");
+			buf.append("}\n");
+			
+			String expected1= buf.toString();
+			
+			assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+			
+			enable(CleanUpConstants.SORT_MEMBERS);
+			enable(CleanUpConstants.SORT_MEMBERS_ALL);
+			
+			buf= new StringBuffer();
+			buf.append("package test;\n");
+			buf.append("public class A {\n");
+			buf.append("    public static final int BB = 2;\n");
+			buf.append("    private static final int AA = 1;\n");
+			buf.append("    protected static final int DD = 3;\n");
+			buf.append("    final static int CC = 4;\n");
+			buf.append("    public final int B = 1;\n");
+			buf.append("    private final int A = 2;\n");
+			buf.append("    protected final int D = 4;\n");
+			buf.append("    final int C = 3;\n");
+			buf.append("}\n");
+			
+			expected1= buf.toString();
+			
+			assertRefactoringResultAsExpected(new ICompilationUnit[] { cu1 }, new String[] { expected1 });
+		} finally {
+			JavaPlugin.getDefault().getPreferenceStore().setToDefault(PreferenceConstants.APPEARANCE_ENABLE_VISIBILITY_SORT_ORDER);
+		}
 	}
 	
 	public void testOrganizeImports01() throws Exception {

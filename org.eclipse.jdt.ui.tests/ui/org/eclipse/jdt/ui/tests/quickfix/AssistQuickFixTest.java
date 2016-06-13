@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@
  *     Sebastian Davids <sdavids@gmx.de> - testInvertEquals1-23
  *     Lukas Hanke <hanke@yatta.de> - Bug 241696 [quick fix] quickfix to iterate over a collection - https://bugs.eclipse.org/bugs/show_bug.cgi?id=241696
  *     Lukas Hanke <hanke@yatta.de> - Bug 430818 [1.8][quick fix] Quick fix for "for loop" is not shown for bare local variable/argument/field - https://bugs.eclipse.org/bugs/show_bug.cgi?id=430818
+ *     Mateusz Matela <mateusz.matela@gmail.com> - [formatter] Formatter does not format Java code correctly, especially when max line width is set
  *******************************************************************************/
 package org.eclipse.jdt.ui.tests.quickfix;
 
@@ -1694,6 +1695,64 @@ public class AssistQuickFixTest extends QuickFixTest {
 		buf.append("        int c = 1;\n");
 		buf.append("        int d = c + a + b;\n");
 		buf.append("        int e = a + b + c;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String ex3= buf.toString();
+
+		assertExpectedExistInProposals(proposals, new String[] { ex1, ex2, ex3 });
+	}
+
+	public void testExtractToLocalVariable4() throws Exception {
+		//bug 457547
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class E {\n");
+		buf.append("    public E() {\n");
+		buf.append("        int a = 1;\n");
+		buf.append("        int b = 1;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
+
+		String selection= "1";
+		int offset= buf.toString().indexOf(selection);
+		AssistContext context= getCorrectionContext(cu, offset, selection.length());
+		List proposals= collectAssists(context, false);
+
+		assertNumberOfProposals(proposals, 4);
+		assertCorrectLabels(proposals);
+
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class E {\n");
+		buf.append("    public E() {\n");
+		buf.append("        int i = 1;\n");
+		buf.append("        int a = i;\n");
+		buf.append("        int b = i;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String ex1= buf.toString();
+
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class E {\n");
+		buf.append("    public E() {\n");
+		buf.append("        int i = 1;\n");
+		buf.append("        int a = i;\n");
+		buf.append("        int b = 1;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String ex2= buf.toString();
+
+		buf= new StringBuffer();
+		buf.append("package test;\n");
+		buf.append("public class E {\n");
+		buf.append("    private static final int _1 = 1;\n");
+		buf.append("\n");
+		buf.append("    public E() {\n");
+		buf.append("        int a = _1;\n");
+		buf.append("        int b = 1;\n");
 		buf.append("    }\n");
 		buf.append("}\n");
 		String ex3= buf.toString();
@@ -7275,8 +7334,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 			buf.append("\n");
 			buf.append("public class A {\n");
 			buf.append("    public void foo(Object o1, Object o2) {\n");
-			buf.append("        System.out.println(MessageFormat.format(\"foo{0} \\\"bar\\\" {1}\", new Object[]{o1,\n");
-			buf.append("                o2}));\n");
+			buf.append("        System.out.println(MessageFormat.format(\"foo{0} \\\"bar\\\" {1}\",\n");
+			buf.append("                new Object[]{o1, o2}));\n");
 			buf.append("    }\n");
 			buf.append("}\n");
 			String expected1= buf.toString();
@@ -8472,8 +8531,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 		buf.append("import java.util.List;\n");
 		buf.append("public class E {\n");
 		buf.append("    void foo() {\n");
-		buf.append("        for (Iterator<? extends Number> iterator = getNums().iterator(); iterator\n");
-		buf.append("                .hasNext();) {\n");
+		buf.append("        for (Iterator<? extends Number> iterator = getNums()\n");
+		buf.append("                .iterator(); iterator.hasNext();) {\n");
 		buf.append("            Number number = iterator.next();\n");
 		buf.append("            System.out.println(number.doubleValue());\n");
 		buf.append("        }\n");
@@ -8589,9 +8648,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 	
 	public void testGenerateForSimple() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -8609,6 +8665,64 @@ public class AssistQuickFixTest extends QuickFixTest {
 		try {
 			fJProject1.setOptions(newOptions);
 			String selection= "collection";
+			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
+			List proposals= collectAssists(context, false);
+
+			assertNumberOfProposals(proposals, 6);
+			assertCorrectLabels(proposals);
+
+			String[] expected= new String[2];
+			buf= new StringBuffer();
+			buf.append("package test1;\n");
+			buf.append("import java.util.Collection;\n");
+			buf.append("public class E {\n");
+			buf.append("    void foo(Collection<String> collection) {\n");
+			buf.append("        for (String string : collection) {\n");
+			buf.append("            \n");
+			buf.append("        }\n");
+			buf.append("    }\n");
+			buf.append("}\n");
+			expected[0]= buf.toString();
+
+			buf= new StringBuffer();
+			buf.append("package test1;\n");
+			buf.append("import java.util.Collection;\n");
+			buf.append("import java.util.Iterator;\n");
+			buf.append("public class E {\n");
+			buf.append("    void foo(Collection<String> collection) {\n");
+			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator\n");
+			buf.append("                .hasNext();) {\n");
+			buf.append("            String string = iterator.next();\n");
+			buf.append("            \n");
+			buf.append("        }\n");
+			buf.append("    }\n");
+			buf.append("}\n");
+			expected[1]= buf.toString();
+
+			assertExpectedExistInProposals(proposals, expected);
+		} finally {
+			fJProject1.setOptions(saveOptions);
+		}
+	}
+
+	public void testGenerateForWithSemicolon() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("import java.util.Collection;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo(Collection<String> collection) {\n");
+		buf.append("        collection;\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
+
+		Map saveOptions= fJProject1.getOptions(false);
+		Map newOptions= new HashMap(saveOptions);
+		newOptions.put(DefaultCodeFormatterConstants.FORMATTER_PUT_EMPTY_STATEMENT_ON_NEW_LINE, "true");
+		try {
+			fJProject1.setOptions(newOptions);
+			String selection= "collection;";
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
@@ -8634,67 +8748,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 			buf.append("import java.util.Iterator;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(Collection<String> collection) {\n");
-			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator.hasNext();) {\n");
-			buf.append("            String string = iterator.next();\n");
-			buf.append("            \n");
-			buf.append("        }\n");
-			buf.append("    }\n");
-			buf.append("}\n");
-			expected[1]= buf.toString();
-
-			assertExpectedExistInProposals(proposals, expected);
-		} finally {
-			fJProject1.setOptions(saveOptions);
-		}
-	}
-
-	public void testGenerateForWithSemicolon() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
-		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
-		StringBuffer buf= new StringBuffer();
-		buf.append("package test1;\n");
-		buf.append("import java.util.Collection;\n");
-		buf.append("public class E {\n");
-		buf.append("    void foo(Collection<String> collection) {\n");
-		buf.append("        collection;\n");
-		buf.append("    }\n");
-		buf.append("}\n");
-		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
-
-		Map saveOptions= fJProject1.getOptions(false);
-		Map newOptions= new HashMap(saveOptions);
-		newOptions.put(DefaultCodeFormatterConstants.FORMATTER_PUT_EMPTY_STATEMENT_ON_NEW_LINE, "true");
-		try {
-			fJProject1.setOptions(newOptions);
-			String selection= "collection;";
-			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
-			List proposals= collectAssists(context, false);
-
-			assertNumberOfProposals(proposals, 2);
-			assertCorrectLabels(proposals);
-
-			String[] expected= new String[2];
-			buf= new StringBuffer();
-			buf.append("package test1;\n");
-			buf.append("import java.util.Collection;\n");
-			buf.append("public class E {\n");
-			buf.append("    void foo(Collection<String> collection) {\n");
-			buf.append("        for (String string : collection) {\n");
-			buf.append("            \n");
-			buf.append("        }\n");
-			buf.append("    }\n");
-			buf.append("}\n");
-			expected[0]= buf.toString();
-
-			buf= new StringBuffer();
-			buf.append("package test1;\n");
-			buf.append("import java.util.Collection;\n");
-			buf.append("import java.util.Iterator;\n");
-			buf.append("public class E {\n");
-			buf.append("    void foo(Collection<String> collection) {\n");
-			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator.hasNext();) {\n");
+			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator\n");
+			buf.append("                .hasNext();) {\n");
 			buf.append("            String string = iterator.next();\n");
 			buf.append("            \n");
 			buf.append("        }\n");
@@ -8767,9 +8822,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 
 	public void testGenerateForComplexParametrization() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -8793,7 +8845,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 5);
+			assertNumberOfProposals(proposals, 7);
 			assertCorrectLabels(proposals);
 
 			String[] expected= new String[3];
@@ -8817,7 +8869,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 			buf.append("import java.util.LinkedList;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(MySecondOwnIterable collection) {\n");
-			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator.hasNext();) {\n");
+			buf.append("        for (Iterator<String> iterator = collection.iterator(); iterator\n");
+			buf.append("                .hasNext();) {\n");
 			buf.append("            String string = iterator.next();\n");
 			buf.append("            \n");
 			buf.append("        }\n");
@@ -8849,9 +8902,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 	
 	public void testGenerateForGenerics() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -8873,7 +8923,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 4);
+			assertNumberOfProposals(proposals, 6);
 			assertCorrectLabels(proposals);
 
 			String[] expected= new String[2];
@@ -8979,14 +9029,11 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 	
 	public void testGenerateForUpperboundWildcard() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
-		buf.append("import java.util.List;\n");
 		buf.append("import java.util.Date;\n");
+		buf.append("import java.util.List;\n");
 		buf.append("public class E {\n");
 		buf.append("    void foo(List<? extends Date> list) {\n");
 		buf.append("        list\n");
@@ -9003,14 +9050,14 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 5);
+			assertNumberOfProposals(proposals, 7);
 			assertCorrectLabels(proposals);
 
 			String[] expected= new String[3];
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
-			buf.append("import java.util.List;\n");
 			buf.append("import java.util.Date;\n");
+			buf.append("import java.util.List;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? extends Date> list) {\n");
 			buf.append("        for (Date date : list) {\n");
@@ -9022,9 +9069,9 @@ public class AssistQuickFixTest extends QuickFixTest {
 
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
+			buf.append("import java.util.Date;\n");
 			buf.append("import java.util.Iterator;\n");
 			buf.append("import java.util.List;\n");
-			buf.append("import java.util.Date;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? extends Date> list) {\n");
 			buf.append("        for (Iterator<? extends Date> iterator = list.iterator(); iterator\n");
@@ -9038,8 +9085,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
-			buf.append("import java.util.List;\n");
 			buf.append("import java.util.Date;\n");
+			buf.append("import java.util.List;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? extends Date> list) {\n");
 			buf.append("        for (int i = 0; i < list.size(); i++) {\n");
@@ -9057,14 +9104,11 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 
 	public void testGenerateForLowerboundWildcard() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
-		buf.append("import java.util.List;\n");
 		buf.append("import java.util.Date;\n");
+		buf.append("import java.util.List;\n");
 		buf.append("public class E {\n");
 		buf.append("    void foo(List<? super Date> list) {\n");
 		buf.append("        list\n");
@@ -9081,14 +9125,14 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 5);
+			assertNumberOfProposals(proposals, 7);
 			assertCorrectLabels(proposals);
 
 			String[] expected= new String[3];
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
-			buf.append("import java.util.List;\n");
 			buf.append("import java.util.Date;\n");
+			buf.append("import java.util.List;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? super Date> list) {\n");
 			buf.append("        for (Object object : list) {\n");
@@ -9100,9 +9144,9 @@ public class AssistQuickFixTest extends QuickFixTest {
 
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
+			buf.append("import java.util.Date;\n");
 			buf.append("import java.util.Iterator;\n");
 			buf.append("import java.util.List;\n");
-			buf.append("import java.util.Date;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? super Date> list) {\n");
 			buf.append("        for (Iterator<? super Date> iterator = list.iterator(); iterator\n");
@@ -9116,8 +9160,8 @@ public class AssistQuickFixTest extends QuickFixTest {
 
 			buf= new StringBuffer();
 			buf.append("package test1;\n");
-			buf.append("import java.util.List;\n");
 			buf.append("import java.util.Date;\n");
+			buf.append("import java.util.List;\n");
 			buf.append("public class E {\n");
 			buf.append("    void foo(List<? super Date> list) {\n");
 			buf.append("        for (int i = 0; i < list.size(); i++) {\n");
@@ -9205,9 +9249,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 
 	public void testGenerateForMissingParametrization() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -9228,7 +9269,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 4);
+			assertNumberOfProposals(proposals, 6);
 			assertCorrectLabels(proposals);
 
 			String[] expected= new String[2];
@@ -9265,9 +9306,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 
 	public void testGenerateForLowVersion() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -9290,7 +9328,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 
-			assertNumberOfProposals(proposals, 3);
+			assertNumberOfProposals(proposals, 5);
 			assertProposalDoesNotExist(proposals, CorrectionMessages.QuickAssistProcessor_generate_enhanced_for_loop);
 			assertCorrectLabels(proposals);
 
@@ -9318,9 +9356,6 @@ public class AssistQuickFixTest extends QuickFixTest {
 	}
 
 	public void testGenerateForArray() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -9340,7 +9375,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 	
-			assertNumberOfProposals(proposals, 4);
+			assertNumberOfProposals(proposals, 6);
 			assertCorrectLabels(proposals);
 	
 			String[] expected= new String[2];
@@ -9372,11 +9407,61 @@ public class AssistQuickFixTest extends QuickFixTest {
 			fJProject1.setOptions(saveOptions);
 		}
 	}
+
+	public void testGenerateForMultiDimensionalArray() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo(String[][] array) {\n");
+		buf.append("        array\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
+
+		Map saveOptions= fJProject1.getOptions(false);
+		Map newOptions= new HashMap(saveOptions);
+		newOptions.put(DefaultCodeFormatterConstants.FORMATTER_PUT_EMPTY_STATEMENT_ON_NEW_LINE, "true");
+		try {
+			fJProject1.setOptions(newOptions);
+			String selection= "array";
+			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
+			List proposals= collectAssists(context, false);
+
+			assertNumberOfProposals(proposals, 6);
+			assertCorrectLabels(proposals);
+
+			String[] expected= new String[2];
+			buf= new StringBuffer();
+			buf.append("package test1;\n");
+			buf.append("public class E {\n");
+			buf.append("    void foo(String[][] array) {\n");
+			buf.append("        for (int i = 0; i < array.length; i++) {\n");
+			buf.append("            String[] name = array[i];\n");
+			buf.append("            \n");
+			buf.append("        }\n");
+			buf.append("    }\n");
+			buf.append("}\n");
+			expected[0]= buf.toString();
+
+			buf= new StringBuffer();
+			buf.append("package test1;\n");
+			buf.append("public class E {\n");
+			buf.append("    void foo(String[][] array) {\n");
+			buf.append("        for (String[] name : array) {\n");
+			buf.append("            \n");
+			buf.append("        }\n");
+			buf.append("    }\n");
+			buf.append("}\n");
+			expected[1]= buf.toString();
 	
+			assertExpectedExistInProposals(proposals, expected);
+		} finally {
+			fJProject1.setOptions(saveOptions);
+		}
+	}
+
 	public void testGenerateForNameClash() throws Exception {
-		if (LocalCorrectionsQuickFixTest.BUG_430818)
-			return;
-		
 		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
 		StringBuffer buf= new StringBuffer();
 		buf.append("package test1;\n");
@@ -9397,7 +9482,7 @@ public class AssistQuickFixTest extends QuickFixTest {
 			AssistContext context= getCorrectionContext(cu, buf.toString().lastIndexOf(selection) + selection.length(), 0);
 			List proposals= collectAssists(context, false);
 	
-			assertNumberOfProposals(proposals, 4);
+			assertNumberOfProposals(proposals, 7);
 			assertCorrectLabels(proposals);
 	
 			String[] expected= new String[2];

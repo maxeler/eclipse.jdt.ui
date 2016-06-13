@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2005, 2014 IBM Corporation and others.
+ * Copyright (c) 2005, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -174,5 +174,75 @@ public class IndentActionTest extends TestCase {
 	public void testBug428384() throws Exception {
 		selectAll();
 		assertIndentResult();
+	}
+
+	public void testBug439582_1() throws Exception {
+		IJavaProject project= IndentTestSetup.getProject();
+		String value= project.getOption(DefaultCodeFormatterConstants.FORMATTER_CONTINUATION_INDENTATION_FOR_ARRAY_INITIALIZER, true);
+		project.setOption(DefaultCodeFormatterConstants.FORMATTER_CONTINUATION_INDENTATION_FOR_ARRAY_INITIALIZER, "1");
+		try {
+			selectAll();
+			assertIndentResult();
+		} finally {
+			project.setOption(DefaultCodeFormatterConstants.FORMATTER_CONTINUATION_INDENTATION_FOR_ARRAY_INITIALIZER, value);
+		}
+	}
+
+	public void testBug439582_2() throws Exception {
+		selectAll();
+		assertIndentResult();
+	}
+
+	public void testBug439582_3() throws Exception {
+		selectAll();
+		assertIndentResult();
+	}
+
+	public void testBug439582_4() throws Exception {
+		selectAll();
+		assertIndentResult();
+	}
+
+	public void testBug439582_5() throws Exception {
+		selectAll();
+		assertIndentResult();
+	}
+
+	public void testBug400670_1() throws Exception {
+		// With formatter profile from https://bugs.eclipse.org/bugs/show_bug.cgi?id=400670#c0
+		String indentOnColumn= DefaultCodeFormatterConstants.createAlignmentValue(true, DefaultCodeFormatterConstants.WRAP_NEXT_PER_LINE, DefaultCodeFormatterConstants.INDENT_ON_COLUMN);
+		IJavaProject project= IndentTestSetup.getProject();
+		String value1= project.getOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ENUM_CONSTANTS, true);
+		project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ENUM_CONSTANTS, indentOnColumn);
+		String value2= project.getOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ARGUMENTS_IN_METHOD_INVOCATION, true);
+		project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ARGUMENTS_IN_METHOD_INVOCATION, indentOnColumn);
+		String value3= project.getOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_EXPRESSIONS_IN_ARRAY_INITIALIZER, true);
+		project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_EXPRESSIONS_IN_ARRAY_INITIALIZER, indentOnColumn);
+		try {
+			selectAll();
+			assertIndentResult();
+		} finally {
+			project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ENUM_CONSTANTS, value1);
+			project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_ARGUMENTS_IN_METHOD_INVOCATION, value2);
+			project.setOption(DefaultCodeFormatterConstants.FORMATTER_ALIGNMENT_FOR_EXPRESSIONS_IN_ARRAY_INITIALIZER, value3);
+		}
+	}
+
+	public void testBug400670_2() throws Exception {
+		// With default formatter profile
+		selectAll();
+		assertIndentResult();
+	}
+
+	public void testBug458763() throws Exception {
+		IJavaProject project= IndentTestSetup.getProject();
+		String value= project.getOption(DefaultCodeFormatterConstants.FORMATTER_INDENT_SWITCHSTATEMENTS_COMPARE_TO_SWITCH, true);
+		project.setOption(DefaultCodeFormatterConstants.FORMATTER_INDENT_SWITCHSTATEMENTS_COMPARE_TO_SWITCH, DefaultCodeFormatterConstants.FALSE);
+		try {
+			selectAll();
+			assertIndentResult();
+		} finally {
+			project.setOption(DefaultCodeFormatterConstants.FORMATTER_INDENT_SWITCHSTATEMENTS_COMPARE_TO_SWITCH, value);
+		}
 	}
 }

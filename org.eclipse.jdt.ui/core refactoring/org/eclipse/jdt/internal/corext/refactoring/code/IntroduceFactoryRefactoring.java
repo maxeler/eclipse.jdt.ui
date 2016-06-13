@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2013 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Samrat Dhillon <samrat.dhillon@gmail.com> - [introduce factory] Introduce Factory on an abstract class adds a statement to create an instance of that class - https://bugs.eclipse.org/bugs/show_bug.cgi?id=395016
+ *     Stephan Herrmann - Contribution for Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.corext.refactoring.code;
 
@@ -637,8 +638,8 @@ public class IntroduceFactoryRefactoring extends Refactoring {
 			ImportRewriteContext context= new ContextSensitiveImportRewriteContext(fFactoryCU, decl.getStartPosition(), fImportRewriter);
 			for (int i= 0; i < unimplementedMethods.length; i++) {
 				IMethodBinding unImplementedMethod= unimplementedMethods[i];
-				MethodDeclaration newMethodDecl= StubUtility2.createImplementationStub(fCUHandle, unitRewriter, fImportRewriter, context, unImplementedMethod, unImplementedMethod.getDeclaringClass()
-						.getName(), settings, false);
+				MethodDeclaration newMethodDecl= StubUtility2.createImplementationStub(fCUHandle, unitRewriter, fImportRewriter, context,
+						unImplementedMethod, unImplementedMethod.getDeclaringClass(), settings, false, fFactoryOwningClass.resolveBinding());
 				decl.bodyDeclarations().add(newMethodDecl);
 			}
 			newCtorCall.setAnonymousClassDeclaration(decl);

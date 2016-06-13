@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,8 @@
  *     Dmitry Stalnov (dstalnov@fusionone.com) - contributed fix for
  *       bug Encapsulate field can fail when two variables in one variable declaration (see
  *       https://bugs.eclipse.org/bugs/show_bug.cgi?id=51540).
+ *     Stephan Herrmann - Configuration for
+ *		 Bug 463360 - [override method][null] generating method override should not create redundant null annotations
  *******************************************************************************/
 package org.eclipse.jdt.internal.corext.dom;
 
@@ -21,14 +23,17 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.Assert;
+import org.eclipse.core.runtime.CoreException;
 
 import org.eclipse.text.edits.TextEdit;
+import org.eclipse.text.edits.TextEditGroup;
 
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
 
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IBuffer;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
@@ -38,6 +43,7 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.compiler.IProblem;
+import org.eclipse.jdt.core.compiler.ITerminalSymbols;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTVisitor;
@@ -60,6 +66,7 @@ import org.eclipse.jdt.core.dom.DoStatement;
 import org.eclipse.jdt.core.dom.EnhancedForStatement;
 import org.eclipse.jdt.core.dom.EnumConstantDeclaration;
 import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.ForStatement;
@@ -686,32 +693,7 @@ public class ASTNodes {
 
 		if (methodBinding != null) {
 			ITypeBinding invocationTargetType;
-			if (parent instanceof MethodInvocation || parent instanceof SuperMethodInvocation) {
-				if (invocationQualifier != null) {
-					invocationTargetType= invocationQualifier.resolveTypeBinding();
-					if (invocationTargetType != null && parent instanceof SuperMethodInvocation) {
-						invocationTargetType= invocationTargetType.getSuperclass();
-					}
-				} else {
-					ITypeBinding enclosingType= getEnclosingType(parent);
-					if (enclosingType != null && parent instanceof SuperMethodInvocation) {
-						enclosingType= enclosingType.getSuperclass();
-					}
-					if (enclosingType != null) {
-						IMethodBinding methodInHierarchy= Bindings.findMethodInHierarchy(enclosingType, methodBinding.getName(), methodBinding.getParameterTypes());
-						if (methodInHierarchy != null) {
-							invocationTargetType= enclosingType;
-						} else {
-							invocationTargetType= methodBinding.getDeclaringClass();
-						}
-					} else {
-						// not expected
-						invocationTargetType= methodBinding.getDeclaringClass();
-					}
-				}
-			} else {
-				invocationTargetType= methodBinding.getDeclaringClass();
-			}
+			invocationTargetType= getInvocationType(parent, methodBinding, invocationQualifier);
 			if (invocationTargetType != null) {
 				TypeBindingVisitor visitor= new AmbiguousTargetMethodAnalyzer(invocationTargetType, methodBinding, argumentIndex, argumentCount, expressionIsExplicitlyTyped);
 				return !(visitor.visit(invocationTargetType) && Bindings.visitHierarchy(invocationTargetType, visitor));
@@ -719,6 +701,47 @@ public class ASTNodes {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Returns the binding of the type which declares the method being invoked.
+	 * 
+	 * @param invocationNode the method invocation node
+	 * @param methodBinding binding of the method being invoked
+	 * @param invocationQualifier the qualifier used for method invocation, or <code>null</code> if
+	 *            none
+	 * @return the binding of the type which declares the method being invoked, or <code>null</code>
+	 *         if the type cannot be resolved
+	 */
+	public static ITypeBinding getInvocationType(ASTNode invocationNode, IMethodBinding methodBinding, Expression invocationQualifier) {
+		ITypeBinding invocationType;
+		if (invocationNode instanceof MethodInvocation || invocationNode instanceof SuperMethodInvocation) {
+			if (invocationQualifier != null) {
+				invocationType= invocationQualifier.resolveTypeBinding();
+				if (invocationType != null && invocationNode instanceof SuperMethodInvocation) {
+					invocationType= invocationType.getSuperclass();
+				}
+			} else {
+				ITypeBinding enclosingType= getEnclosingType(invocationNode);
+				if (enclosingType != null && invocationNode instanceof SuperMethodInvocation) {
+					enclosingType= enclosingType.getSuperclass();
+				}
+				if (enclosingType != null) {
+					IMethodBinding methodInHierarchy= Bindings.findMethodInHierarchy(enclosingType, methodBinding.getName(), methodBinding.getParameterTypes());
+					if (methodInHierarchy != null) {
+						invocationType= enclosingType;
+					} else {
+						invocationType= methodBinding.getDeclaringClass();
+					}
+				} else {
+					// not expected
+					invocationType= methodBinding.getDeclaringClass();
+				}
+			}
+		} else {
+			invocationType= methodBinding.getDeclaringClass();
+		}
+		return invocationType;
 	}
 
 	private static class AmbiguousTargetMethodAnalyzer implements TypeBindingVisitor {
@@ -1135,6 +1158,29 @@ public class ASTNodes {
 		return null;
 	}
 
+	public static IBinding getEnclosingDeclaration(ASTNode node) {
+		while(node != null) {
+			if (node instanceof AbstractTypeDeclaration) {
+				return ((AbstractTypeDeclaration)node).resolveBinding();
+			} else if (node instanceof AnonymousClassDeclaration) {
+				return ((AnonymousClassDeclaration)node).resolveBinding();
+			} else if (node instanceof MethodDeclaration) {
+				return ((MethodDeclaration)node).resolveBinding();
+			} else if (node instanceof FieldDeclaration) {
+				List<?> fragments= ((FieldDeclaration)node).fragments();
+				if (fragments.size() > 0)
+					return ((VariableDeclarationFragment)fragments.get(0)).resolveBinding();
+			} else if (node instanceof VariableDeclarationFragment) {
+				IVariableBinding variableBinding= ((VariableDeclarationFragment)node).resolveBinding();
+				if (variableBinding.getDeclaringMethod() != null || variableBinding.getDeclaringClass() != null)
+					return variableBinding;
+				// workaround for incomplete wiring of DOM bindings: keep searching when variableBinding is unparented
+			}
+			node= node.getParent();
+		}
+		return null;
+	}
+
 	public static IProblem[] getProblems(ASTNode node, int scope, int severity) {
 		ASTNode root= node.getRoot();
 		if (!(root instanceof CompilationUnit))
@@ -1430,7 +1476,7 @@ public class ASTNodes {
 	/**
 	 * Escapes a string value to a literal that can be used in Java source.
 	 * 
-	 * @param stringValue the string value 
+	 * @param stringValue the string value
 	 * @return the escaped string
 	 * @see StringLiteral#getEscapedValue()
 	 */
@@ -1443,7 +1489,7 @@ public class ASTNodes {
 	/**
 	 * Escapes a character value to a literal that can be used in Java source.
 	 * 
-	 * @param ch the character value 
+	 * @param ch the character value
 	 * @return the escaped string
 	 * @see CharacterLiteral#getEscapedValue()
 	 */
@@ -1451,6 +1497,28 @@ public class ASTNodes {
 		CharacterLiteral characterLiteral= AST.newAST(ASTProvider.SHARED_AST_LEVEL).newCharacterLiteral();
 		characterLiteral.setCharValue(ch);
 		return characterLiteral.getEscapedValue();
+	}
+
+	/**
+	 * If the given <code>node</code> has already been rewritten, undo that rewrite and return the
+	 * replacement version of the node. Otherwise, return the result of
+	 * {@link ASTRewrite#createCopyTarget(ASTNode)}.
+	 * 
+	 * @param rewrite ASTRewrite for the given node
+	 * @param node the node to get the replacement or to create a copy placeholder for
+	 * @param group the edit group which collects the corresponding text edits, or <code>null</code>
+	 *            if ungrouped
+	 * @return the replacement node if the given <code>node</code> has already been rewritten or the
+	 *         new copy placeholder node
+	 */
+	public static ASTNode getCopyOrReplacement(ASTRewrite rewrite, ASTNode node, TextEditGroup group) {
+		ASTNode rewrittenNode= (ASTNode) rewrite.get(node.getParent(), node.getLocationInParent());
+		if (rewrittenNode != node) {
+			// Undo previous rewrite to avoid the problem that the same node would be inserted in two places:
+			rewrite.replace(rewrittenNode, node, group);
+			return rewrittenNode;
+		}
+		return rewrite.createCopyTarget(node);
 	}
 
 	/**
@@ -1499,5 +1567,27 @@ public class ASTNodes {
 			}
 		}
 		return variableNames;
+	}
+
+	/**
+	 * Checks whether the given <code>exprStatement</code> has a semicolon at the end.
+	 * 
+	 * @param exprStatement the {@link ExpressionStatement} to check the semicolon
+	 * @param cu the compilation unit
+	 * @return <code>true</code> if the given <code>exprStatement</code> has a semicolon at the end,
+	 *         <code>false</code> otherwise
+	 */
+	public static boolean hasSemicolon(ExpressionStatement exprStatement, ICompilationUnit cu) {
+		boolean hasSemicolon= true;
+		if ((exprStatement.getFlags() & ASTNode.RECOVERED) != 0) {
+			try {
+				Expression expression= exprStatement.getExpression();
+				TokenScanner scanner= new TokenScanner(cu);
+				hasSemicolon= scanner.readNext(expression.getStartPosition() + expression.getLength(), true) == ITerminalSymbols.TokenNameSEMICOLON;
+			} catch (CoreException e) {
+				hasSemicolon= false;
+			}
+		}
+		return hasSemicolon;
 	}
 }

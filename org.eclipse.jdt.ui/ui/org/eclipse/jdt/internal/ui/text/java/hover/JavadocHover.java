@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2014 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *     Genady Beryozkin <eclipse@genady.org> - [hovering] tooltip for constant string does not show constant value - https://bugs.eclipse.org/bugs/show_bug.cgi?id=85382
+ *     Stephan Herrmann - Contribution for Bug 403917 - [1.8] Render TYPE_USE annotations in Javadoc hover/view
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.java.hover;
 
@@ -22,6 +23,7 @@ import java.net.URL;
 import org.osgi.framework.Bundle;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Drawable;
 import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
@@ -38,6 +40,7 @@ import org.eclipse.jface.internal.text.html.BrowserInformationControl;
 import org.eclipse.jface.internal.text.html.BrowserInformationControlInput;
 import org.eclipse.jface.internal.text.html.BrowserInput;
 import org.eclipse.jface.internal.text.html.HTMLPrinter;
+import org.eclipse.jface.internal.text.html.HTMLTextPresenter;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.StructuredSelection;
 
@@ -49,6 +52,7 @@ import org.eclipse.jface.text.IInformationControlExtension4;
 import org.eclipse.jface.text.IInputChangedListener;
 import org.eclipse.jface.text.IRegion;
 import org.eclipse.jface.text.ITextViewer;
+import org.eclipse.jface.text.TextPresentation;
 
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.ISharedImages;
@@ -65,10 +69,13 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.ILocalVariable;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IPackageDeclaration;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.ISourceReference;
+import org.eclipse.jdt.core.ITypeParameter;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
@@ -83,6 +90,7 @@ import org.eclipse.jdt.core.dom.IMemberValuePairBinding;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.IVariableBinding;
+import org.eclipse.jdt.core.dom.LambdaExpression;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
@@ -120,6 +128,21 @@ import org.eclipse.jdt.internal.ui.viewsupport.JavaElementLinks;
  */
 public class JavadocHover extends AbstractJavaEditorTextHover {
 
+	public static class FallbackInformationPresenter extends HTMLTextPresenter {
+		public FallbackInformationPresenter() {
+			super(false);
+		}
+		
+		@Override
+		public String updatePresentation(Drawable drawable, String hoverInfo, TextPresentation presentation, int maxWidth, int maxHeight) {
+			String warningInfo= JavaHoverMessages.JavadocHover_fallback_warning;
+			String warning= super.updatePresentation(drawable, warningInfo, presentation, maxWidth, maxHeight);
+			presentation.clear();
+			
+			String content= super.updatePresentation(drawable, hoverInfo, presentation, maxWidth, maxHeight);
+			return content + "\n\n" + warning; //$NON-NLS-1$
+		}
+	}
 	/**
 	 * Action to go back to the previous input in the hover control.
 	 *
@@ -241,7 +264,7 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 		public OpenDeclarationAction(BrowserInformationControl infoControl) {
 			fInfoControl= infoControl;
 			setText(JavaHoverMessages.JavadocHover_openDeclaration);
-			JavaPluginImages.setLocalImageDescriptors(this, "goto_input.gif"); //$NON-NLS-1$ //TODO: better images
+			JavaPluginImages.setLocalImageDescriptors(this, "goto_input.png"); //$NON-NLS-1$ //TODO: better images
 		}
 
 		/*
@@ -401,7 +424,16 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 				addLinkListener(iControl);
 				return iControl;
 			} else {
-				return new DefaultInformationControl(parent, tooltipAffordanceString);
+				return new DefaultInformationControl(parent, tooltipAffordanceString) {
+					@Override
+					public IInformationControlCreator getInformationPresenterControlCreator() {
+						return new IInformationControlCreator() {
+							public IInformationControl createInformationControl(Shell parentShell) {
+								return new DefaultInformationControl(parentShell, (ToolBarManager) null, new FallbackInformationPresenter());
+							}
+						};
+					}
+				};
 			}
 		}
 
@@ -678,20 +710,22 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 			}
 		} else {
 			element= elements[0];
-			
-			if (element instanceof IPackageFragment || element instanceof IMember) {
+
+			if (element instanceof IPackageFragment || element instanceof IMember
+					|| element instanceof ILocalVariable || element instanceof ITypeParameter) {
 				HTMLPrinter.addSmallHeader(buffer, getInfoText(element, editorInputElement, hoverRegion, true));
 				buffer.append("<br>"); //$NON-NLS-1$
 				addAnnotations(buffer, element, editorInputElement, hoverRegion);
 				Reader reader= null;
 				try {
-					String content= element instanceof IMember
-							? JavadocContentAccess2.getHTMLContent((IMember) element, true)
-							: JavadocContentAccess2.getHTMLContent((IPackageFragment) element);
+					String content= JavadocContentAccess2.getHTMLContent(element, true);
 					IPackageFragmentRoot root= (IPackageFragmentRoot) element.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
 					boolean isBinary= root.exists() && root.getKind() == IPackageFragmentRoot.K_BINARY;
 					if (content != null) {
-						base= JavaDocLocations.getBaseURL(element, isBinary);
+						base= JavadocContentAccess2.extractBaseURL(content);
+						if (base == null) {
+							base= JavaDocLocations.getBaseURL(element, isBinary);
+						}
 						reader= new StringReader(content);
 					} else {
 						String explanationForMissingJavadoc= JavaDocLocations.getExplanationForMissingJavadoc(element, root);
@@ -705,12 +739,6 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 				if (reader != null) {
 					HTMLPrinter.addParagraph(buffer, reader);
 				}
-				hasContents= true;
-
-			} else if (element.getElementType() == IJavaElement.LOCAL_VARIABLE || element.getElementType() == IJavaElement.TYPE_PARAMETER) {
-				addAnnotations(buffer, element, editorInputElement, hoverRegion);
-				HTMLPrinter.addSmallHeader(buffer, getInfoText(element, editorInputElement, hoverRegion, true));
-				// could add info from @param tag here...
 				hasContents= true;
 			}
 			leadingImageWidth= 20;
@@ -734,8 +762,18 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 
 	private static String getInfoText(IJavaElement element, ITypeRoot editorInputElement, IRegion hoverRegion, boolean allowImage) {
 		long flags= getHeaderFlags(element);
-		StringBuffer label= new StringBuffer(JavaElementLinks.getElementLabel(element, flags));
 		
+		boolean haveSource= editorInputElement instanceof ICompilationUnit;
+		ASTNode node= haveSource ? getHoveredASTNode(editorInputElement, hoverRegion) : null;
+		IBinding binding= getHoverBinding(element, node);
+
+		StringBuffer label;
+		if (binding != null) {
+			label= new StringBuffer(JavaElementLinks.getBindingLabel(binding, element, flags, haveSource));
+		} else {
+			label= new StringBuffer(JavaElementLinks.getElementLabel(element, flags));
+		}
+
 		if (element.getElementType() == IJavaElement.FIELD) {
 			String constantValue= getConstantValue((IField) element, editorInputElement, hoverRegion);
 			if (constantValue != null) {
@@ -753,6 +791,37 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 
 		return getImageAndLabel(element, allowImage, label.toString());
 	}
+
+	/**
+	 * Try to acquire a binding corresponding to the given element 
+	 * for more precise information about (type) annotations.
+	 *
+	 * Currently this lookup is only enabled when null-annotations are enabled for the project.
+	 *
+	 * @param element the element being rendered
+	 * @param node the AST node corresponding to the given element, or null, if no AST node is available.
+	 * @return either a binding corresponding to the given element or null.
+	 */
+	public static IBinding getHoverBinding(IJavaElement element, ASTNode node) {
+
+		if (element.getJavaProject().getOption(JavaCore.COMPILER_ANNOTATION_NULL_ANALYSIS, true).equals(JavaCore.ENABLED)) {
+			if (node == null) {
+				if (element instanceof ISourceReference) {
+					ASTParser p= ASTParser.newParser(ASTProvider.SHARED_AST_LEVEL);
+					p.setProject(element.getJavaProject());
+					p.setBindingsRecovery(true);
+					try {
+						return p.createBindings(new IJavaElement[] { element }, null)[0];
+					} catch (OperationCanceledException e) {
+						return null;
+					}
+				}
+			} else {
+				return resolveBinding(node);
+			}
+		}
+		return null;
+	}
 	
 	private static String getImageURL(IJavaElement element) {
 		String imageName= null;
@@ -764,13 +833,14 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 		return imageName;
 	}
 
-	private static long getHeaderFlags(IJavaElement element) {
+	public static long getHeaderFlags(IJavaElement element) {
 		switch (element.getElementType()) {
 			case IJavaElement.LOCAL_VARIABLE:
 				return LOCAL_VARIABLE_FLAGS;
 			case IJavaElement.TYPE_PARAMETER:
 				return TYPE_PARAMETER_FLAGS;
 			case IJavaElement.PACKAGE_FRAGMENT:
+			case IJavaElement.PACKAGE_DECLARATION:
 				return PACKAGE_FLAGS;
 			default:
 				return LABEL_FLAGS;
@@ -1054,6 +1124,8 @@ public class JavadocHover extends AbstractJavaEditorTextHover {
 			return ((SuperConstructorInvocation) node).resolveConstructorBinding();
 		} else if (node instanceof ConstructorInvocation) {
 			return ((ConstructorInvocation) node).resolveConstructorBinding();
+		} else if (node instanceof LambdaExpression) {
+			return ((LambdaExpression) node).resolveMethodBinding();
 		} else {
 			return null;
 		}

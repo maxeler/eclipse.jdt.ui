@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2012 IBM Corporation and others.
+ * Copyright (c) 2000, 2015 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -80,8 +80,8 @@ public class RefreshAction extends SelectionDispatchAction {
 		}
 
 		@Override
-		protected List<IResource> getSelectedResources() {
-			List<IResource> selectedResources= super.getSelectedResources();
+		protected List<? extends IResource> getSelectedResources() {
+			List<? extends IResource> selectedResources= super.getSelectedResources();
 			if (!getStructuredSelection().isEmpty() && selectedResources.size() == 1 && selectedResources.get(0) instanceof IWorkspaceRoot) {
 				selectedResources= Collections.emptyList(); // Refresh action refreshes root when it can't find any resources in selection
 			}
@@ -98,7 +98,7 @@ public class RefreshAction extends SelectionDispatchAction {
 				if (curr instanceof IWorkingSet) {
 					IAdaptable[] members= ((IWorkingSet) curr).getElements();
 					for (int k= 0; k < members.length; k++) {
-						IResource adapted= (IResource) members[k].getAdapter(IResource.class);
+						IResource adapted= members[k].getAdapter(IResource.class);
 						if (adapted != null) {
 							selectedResources.add(adapted);
 						}
@@ -136,7 +136,7 @@ public class RefreshAction extends SelectionDispatchAction {
 		super(site);
 		setText(ActionMessages.RefreshAction_label);
 		setToolTipText(ActionMessages.RefreshAction_toolTip);
-		JavaPluginImages.setLocalImageDescriptors(this, "refresh.gif");//$NON-NLS-1$
+		JavaPluginImages.setLocalImageDescriptors(this, "refresh.png");//$NON-NLS-1$
 		PlatformUI.getWorkbench().getHelpSystem().setHelp(this, IJavaHelpContextIds.REFRESH_ACTION);
 	}
 
@@ -165,7 +165,7 @@ public class RefreshAction extends SelectionDispatchAction {
 				// too expensive to look at children. assume we can refresh
 				okToRefresh= true;
 			} else if (element instanceof IAdaptable) { // test for IAdaptable last (types before are IAdaptable as well)
-				IResource resource= (IResource)((IAdaptable)element).getAdapter(IResource.class);
+				IResource resource= ((IAdaptable)element).getAdapter(IResource.class);
 				okToRefresh|= resource != null && (resource.getType() != IResource.PROJECT || ((IProject) resource).isOpen());
 			} else {
 				// nothing to say;
@@ -208,7 +208,7 @@ public class RefreshAction extends SelectionDispatchAction {
 			} else if (curr instanceof IWorkingSet) {
 				IAdaptable[] members= ((IWorkingSet) curr).getElements();
 				for (int k= 0; k < members.length; k++) {
-					IJavaElement adapted= (IJavaElement)members[k].getAdapter(IJavaElement.class);
+					IJavaElement adapted= members[k].getAdapter(IJavaElement.class);
 					if (adapted instanceof IPackageFragmentRoot) {
 						javaElements.add(adapted);
 					}
