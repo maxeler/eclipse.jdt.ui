@@ -88,6 +88,7 @@ public final class JavaModelUtil {
 	 * @see #getRenamedCUName(ICompilationUnit, String)
 	 */
 	public static final String DEFAULT_CU_SUFFIX= ".java"; //$NON-NLS-1$
+	public static final String DEFAULT_MAXJ_SUFFIX= ".maxj"; //$NON-NLS-1$
 
 	/**
 	 * The name of the package-info.java file.

@@ -56,13 +56,33 @@
 		break;
 }</template>
 
+<template name="SWITCH" description="%Templates.SWITCH" id="org.eclipse.jdt.ui.templates.SWITCH" context="java-statements" enabled="true" autoinsert="false">SWITCH (${argument}) {
+	CASE (${argument}) {
+		${cursor}
+	}
+	
+	OTHERWISE {
+
+	}
+}</template>
+
 <template name="if" description="%Templates.if" id="org.eclipse.jdt.ui.templates.if" context="java-statements" enabled="true" autoinsert="false">if (${condition:var(boolean)}) {
+	${line_selection}${cursor}
+}</template>
+
+<template name="IF" description="%Templates.IF" id="org.eclipse.jdt.ui.templates.IF" context="java-statements" enabled="true" autoinsert="false">IF (${argument}) {
 	${line_selection}${cursor}
 }</template>
 
 <template name="ifelse" description="%Templates.ifelse" id="org.eclipse.jdt.ui.templates.ifelse" context="java-statements" enabled="true" autoinsert="false">if (${condition:var(boolean)}) {
 	${cursor}
 } else {
+	
+}</template>
+
+<template name="IFELSE" description="%Templates.IFELSE" id="org.eclipse.jdt.ui.templates.IFELSE" context="java-statements" enabled="true" autoinsert="false">IF (${argument}) {
+	${cursor}
+} ELSE {
 	
 }</template>
 
