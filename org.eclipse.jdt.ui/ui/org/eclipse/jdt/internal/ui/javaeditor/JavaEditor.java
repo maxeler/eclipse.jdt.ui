@@ -229,6 +229,7 @@ import org.eclipse.jdt.internal.ui.text.JavaPairMatcher;
 import org.eclipse.jdt.internal.ui.text.JavaWordFinder;
 import org.eclipse.jdt.internal.ui.text.JavaWordIterator;
 import org.eclipse.jdt.internal.ui.text.PreferencesAdapter;
+import org.eclipse.jdt.internal.ui.text.java.FileTypePreferenceStore;
 import org.eclipse.jdt.internal.ui.text.java.hover.JavaExpandHover;
 import org.eclipse.jdt.internal.ui.text.java.hover.SourceViewerInformationControl;
 import org.eclipse.jdt.internal.ui.util.ElementValidator;
@@ -2056,7 +2057,11 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 		stores.add(new PreferencesAdapter(JavaPlugin.getJavaCorePluginPreferences()));
 		stores.add(EditorsUI.getPreferenceStore());
 		stores.add(PlatformUI.getPreferenceStore());
-
+		FileTypePreferenceStore fileTypeStore = new FileTypePreferenceStore();
+ 		if(input.getName().endsWith(JavaModelUtil.DEFAULT_MAXJ_SUFFIX))
+ 			fileTypeStore.setValue(FileTypePreferenceStore.KEYNAME, JavaModelUtil.DEFAULT_MAXJ_SUFFIX);
+ 		stores.add(fileTypeStore);
+ 		
 		return new ChainedPreferenceStore(stores.toArray(new IPreferenceStore[stores.size()]));
 	}
 

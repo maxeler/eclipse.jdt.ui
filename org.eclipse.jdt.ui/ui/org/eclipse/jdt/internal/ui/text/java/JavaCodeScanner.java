@@ -30,7 +30,11 @@ import org.eclipse.jface.text.rules.SingleLineRule;
 import org.eclipse.jface.text.rules.Token;
 import org.eclipse.jface.text.rules.WhitespaceRule;
 
+import org.eclipse.ui.texteditor.ChainedPreferenceStore;
+
 import org.eclipse.jdt.core.JavaCore;
+
+import org.eclipse.jdt.internal.corext.util.JavaModelUtil;
 
 import org.eclipse.jdt.ui.PreferenceConstants;
 import org.eclipse.jdt.ui.text.IColorManager;
@@ -395,6 +399,7 @@ public final class JavaCodeScanner extends AbstractJavaScanner {
 	private static String[] fgJava14Keywords= { "assert" }; //$NON-NLS-1$
 	private static String[] fgJava15Keywords= { "enum" }; //$NON-NLS-1$
 
+	private static String[] fgMaxJKeywords= { "IF" , "ELSE", "CASE", "SWITCH", "OTHERWISE"};
 	private static String[] fgTypes= { "void", "boolean", "char", "byte", "short", "strictfp", "int", "long", "float", "double" }; //$NON-NLS-1$ //$NON-NLS-5$ //$NON-NLS-7$ //$NON-NLS-6$ //$NON-NLS-8$ //$NON-NLS-9$  //$NON-NLS-10$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-2$
 
 	private static String[] fgConstants= { "false", "null", "true" }; //$NON-NLS-3$ //$NON-NLS-2$ //$NON-NLS-1$
@@ -402,6 +407,7 @@ public final class JavaCodeScanner extends AbstractJavaScanner {
 	private static final String ANNOTATION_BASE_KEY= PreferenceConstants.EDITOR_SEMANTIC_HIGHLIGHTING_PREFIX + SemanticHighlightings.ANNOTATION;
 	private static final String ANNOTATION_COLOR_KEY= ANNOTATION_BASE_KEY + PreferenceConstants.EDITOR_SEMANTIC_HIGHLIGHTING_COLOR_SUFFIX;
 
+	private static String fileType;
 	private static String[] fgTokenProperties= {
 		IJavaColorConstants.JAVA_KEYWORD,
 		IJavaColorConstants.JAVA_STRING,
@@ -497,9 +503,22 @@ public final class JavaCodeScanner extends AbstractJavaScanner {
 
 		// Add word rule for keywords, types, and constants.
 		CombinedWordRule.WordMatcher wordRule= new CombinedWordRule.WordMatcher();
+
+		ChainedPreferenceStore store;
+ 		if(getPreferenceStore() instanceof ChainedPreferenceStore){
+ 			store = (ChainedPreferenceStore)getPreferenceStore();
+ 			fileType = store.getString(FileTypePreferenceStore.KEYNAME);
+ 		}
+
 		token= getToken(IJavaColorConstants.JAVA_KEYWORD);
 		for (int i=0; i<fgKeywords.length; i++)
 			wordRule.addWord(fgKeywords[i], token);
+
+		if(fileType != null && fileType.equals(JavaModelUtil.DEFAULT_MAXJ_SUFFIX)){
+ 			for (int i=0; i<fgMaxJKeywords.length; i++)
+ 				wordRule.addWord(fgMaxJKeywords[i], token);			
+ 		}
+
 		for (int i=0; i<fgTypes.length; i++)
 			wordRule.addWord(fgTypes[i], token);
 		for (int i=0; i<fgConstants.length; i++)
