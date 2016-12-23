@@ -4951,7 +4951,7 @@ public class AdvancedQuickAssistTest extends QuickFixTest {
 		List<IJavaCompletionProposal> proposals= Arrays.asList(new QuickTemplateProcessor().getAssists(context, null));
 
 		assertCorrectLabels(proposals);
-		assertNumberOfProposals(proposals, 9);
+		assertNumberOfProposals(proposals, 10);
 
 		String[] expected= new String[9];
 
@@ -5086,7 +5086,7 @@ public class AdvancedQuickAssistTest extends QuickFixTest {
 		List<IJavaCompletionProposal> proposals= Arrays.asList(new QuickTemplateProcessor().getAssists(context, null));
 
 		assertCorrectLabels(proposals);
-		assertNumberOfProposals(proposals, 9);
+		assertNumberOfProposals(proposals, 10);
 
 		String[] expected= new String[9];
 
@@ -5231,7 +5231,7 @@ public class AdvancedQuickAssistTest extends QuickFixTest {
 		List<IJavaCompletionProposal> proposals= Arrays.asList(new QuickTemplateProcessor().getAssists(context, null));
 
 		assertCorrectLabels(proposals);
-		assertNumberOfProposals(proposals, 9);
+		assertNumberOfProposals(proposals, 10);
 
 		String[] expected= new String[9];
 
@@ -5394,7 +5394,7 @@ public class AdvancedQuickAssistTest extends QuickFixTest {
 		List<IJavaCompletionProposal> proposals= Arrays.asList(new QuickTemplateProcessor().getAssists(context, null));
 
 		assertCorrectLabels(proposals);
-		assertNumberOfProposals(proposals, 9);
+		assertNumberOfProposals(proposals, 10);
 
 		String[] expected= new String[9];
 
